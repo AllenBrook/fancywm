@@ -7,31 +7,33 @@
              xmlns:ui="http://schemas.modernwpf.com/2019"
              xmlns:res="clr-namespace:FancyWM.Resources"
              xmlns:viewmodels="clr-namespace:FancyWM.ViewModels" xmlns:sys="clr-namespace:System;assembly=netstandard"
+             xmlns:theme="clr-namespace:FancyWM.ThemeEngine.Wpf;assembly=FancyWM.ThemeEngine"
              d:DataContext="{d:DesignInstance Type=viewmodels:TilingPanelViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="20"
              d:DesignWidth="800">
-    <Border CornerRadius="{DynamicResource ControlCornerRadius}" MouseDown="OnPanelMouseDown">
-        <Border.Background>
-            <SolidColorBrush Color="{DynamicResource TabBarColor}" />
-        </Border.Background>
+    <Border MouseDown="OnPanelMouseDown"
+            CornerRadius="{theme:CssResource panel-bar/border-radius}"
+            Background="{theme:CssResource panel-bar/background}"
+            Effect="{theme:CssResource panel-bar/filter}">
         <Border.OpacityMask>
             <VisualBrush>
                 <VisualBrush.Visual>
                     <Border
                         Background="Black"
                         SnapsToDevicePixels="True"
-                        CornerRadius="{Binding CornerRadius, RelativeSource={RelativeSource AncestorType=Border}}"
+                        CornerRadius="{theme:CssResource panel-bar/border-radius}"
                         Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Border}}"
                         Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Border}}"
                     />
                 </VisualBrush.Visual>
             </VisualBrush>
         </Border.OpacityMask>
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="2" Direction="-90" ShadowDepth="2" Opacity="0.2" Color="Black" />
-        </Border.Effect>
-        <Border Padding="0.5" CornerRadius="{DynamicResource ControlCornerRadius}" BorderThickness="0.5" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+        <Border Padding="0.5"
+                CornerRadius="{theme:CssResource panel-bar/border-radius}"
+                BorderThickness="{theme:CssResource panel-bar/border-width}"
+                BorderBrush="{theme:CssResource panel-bar/border-color}"
+                ClipToBounds="True">
             <Border.Background>
                 <SolidColorBrush Color="{DynamicResource MicaPrimaryColor}" Opacity="{DynamicResource MicaOpacity}" />
             </Border.Background>
@@ -48,44 +50,95 @@
             </Border.Triggers>
             <DockPanel LastChildFill="True">
                 <DockPanel.Resources>
-                    <ui:SimpleStackPanel x:Key="Panellocal" Spacing="1" Orientation="Horizontal" TextBlock.Foreground="{DynamicResource SystemControlPageBackgroundAltHighBrush}">
+                    <ui:SimpleStackPanel x:Key="Panellocal" Spacing="1" Orientation="Horizontal">
                         <ui:SimpleStackPanel.Resources>
                             <ResourceDictionary>
-                                <Style x:Key="ActionButtonStyle" BasedOn="{StaticResource AccentButtonStyle}" TargetType="Button">
+                                <Style x:Key="ActionButtonStyle" TargetType="Button">
                                     <Setter Property="Padding" Value="5,1" />
-                                    <Setter Property="TextBlock.TextAlignment" Value="Center" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Center" />
                                     <Setter Property="VerticalContentAlignment" Value="Top" />
+                                    <Setter Property="Background" Value="{theme:CssResource panel-bar-button/background, As=Brush}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border
+                                                    x:Name="Background"
+                                                    Background="{TemplateBinding Background}"
+                                                    CornerRadius="{theme:CssResource panel-bar-button/border-radius}"
+                                                    SnapsToDevicePixels="True">
+                                                    <Border
+                                                        x:Name="Border"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        CornerRadius="{theme:CssResource panel-bar-button/border-radius}">
+                                                        <ContentPresenter
+                                                            x:Name="ContentPresenter"
+                                                            TextElement.Foreground="{TemplateBinding Foreground}"
+                                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                            Focusable="False"
+                                                            RecognizesAccessKey="True"
+                                                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                                    </Border>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Background" Property="Background" Value="{DynamicResource AccentButtonBackgroundPointerOver}" />
+                                                        <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentButtonBorderBrushPointerOver}" />
+                                                        <Setter TargetName="ContentPresenter" Property="TextElement.Foreground" Value="{DynamicResource AccentButtonForegroundPointerOver}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Background" Property="Background" Value="{DynamicResource AccentButtonBackgroundPressed}" />
+                                                        <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentButtonBorderBrushPressed}" />
+                                                        <Setter TargetName="ContentPresenter" Property="TextElement.Foreground" Value="{DynamicResource AccentButtonForegroundPressed}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter TargetName="Background" Property="Background" Value="{DynamicResource AccentButtonBackgroundDisabled}" />
+                                                        <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentButtonBorderBrushDisabled}" />
+                                                        <Setter TargetName="ContentPresenter" Property="TextElement.Foreground" Value="{DynamicResource AccentButtonForegroundDisabled}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Background" Property="Background" Value="{theme:CssResource panel-bar-button:hover/background, As=Brush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Background" Property="Background" Value="{theme:CssResource panel-bar-button:active/background, As=Brush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
                                 </Style>
                             </ResourceDictionary>
                         </ui:SimpleStackPanel.Resources>
-                        <Border CornerRadius="{DynamicResource ControlCornerRadius}"  Cursor="../Resources/hand_grab.cur" MouseEnter="OnHandleMouseEnter" MouseLeave="OnHandleMouseLeave" Padding="5,0,7,0" Background="{DynamicResource SystemControlHighlightAccentRevealBackgroundBrush}">
+                        <Border CornerRadius="{theme:CssResource panel-bar-handle/border-radius}"  Cursor="../Resources/hand_grab.cur" MouseEnter="OnHandleMouseEnter" MouseLeave="OnHandleMouseLeave" Padding="5,0,7,0" Background="{theme:CssResource panel-bar-handle/background}">
                             <StackPanel Orientation="Horizontal">
                                 <local:TilingNodeCaptionBlock
                                         ExtraTextVisibility="Collapsed"
                                         VerticalAlignment="Center"
-                                        TextBlock.Foreground="{DynamicResource SystemControlForegroundAltHighBrush}"
-                                        TextBlock.FontWeight="SemiBold"
+                                        Foreground="{theme:CssResource panel-bar-handle/color}"
+                                        FontWeight="SemiBold"
                                         DataContext="{Binding}" />
-                                <ui:FontIcon Margin="5,0,0,0" FontSize="10" FontFamily="Segoe MDL2 Assets" Glyph="&#xE970;"/>
+                                <ui:FontIcon Margin="5,0,0,0" FontSize="10" FontFamily="Segoe MDL2 Assets" Glyph="&#xE970;" Foreground="{theme:CssResource panel-bar-handle/color}" />
                             </StackPanel>
                         </Border>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_CreateHorizontalPanel_Caption}" Command="{Binding HorizontalSplitCommand}">
                             <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
-                                <local:SvgIcon Icon="hsplit" Color="{DynamicResource SystemControlForegroundAltHighBrush}" />
+                                <local:SvgIcon Icon="hsplit" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_CreateVerticalPanel_Caption}" Command="{Binding VerticalSplitCommand}">
                             <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
-                                <local:SvgIcon Icon="vsplit" Color="{DynamicResource SystemControlForegroundAltHighBrush}" />
+                                <local:SvgIcon Icon="vsplit" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_PullWindowUp_Caption}" Command="{Binding PullUpCommand}">
                             <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
-                                <local:SvgIcon Icon="pull-up" Color="{DynamicResource SystemControlForegroundAltHighBrush}" />
+                                <local:SvgIcon Icon="pull-up" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
                     </ui:SimpleStackPanel>
-                    <Border x:Key="PanelCaption" CornerRadius="{DynamicResource ControlCornerRadius}" Padding="5,0,7,0" Background="{DynamicResource SystemControlHighlightAccentRevealBackgroundBrush}">
+                    <Border x:Key="PanelCaption" CornerRadius="{theme:CssResource panel-bar-handle/border-radius}" Padding="5,0,7,0" Background="{theme:CssResource panel-bar-handle/background}">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Style.Triggers>
@@ -105,8 +158,8 @@
                         <local:TilingNodeCaptionBlock
                             ExtraTextVisibility="Collapsed"
                             VerticalAlignment="Center"
-                            TextBlock.Foreground="{DynamicResource SystemControlForegroundAltHighBrush}"
-                            TextBlock.FontWeight="SemiBold"
+                            Foreground="{theme:CssResource panel-bar-handle/color}"
+                            FontWeight="SemiBold"
                             DataContext="{Binding}" />
                     </Border>
                 </DockPanel.Resources>

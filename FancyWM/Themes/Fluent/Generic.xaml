@@ -1,6 +1,6 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:res="clr-namespace:FancyWM.Resources">
+                    xmlns:res="clr-namespace:FancyWM.Resources" xmlns:sys="clr-namespace:System;assembly=netstandard">
     <SolidColorBrush x:Key="SystemAccentLowBrush" Color="{DynamicResource SystemAccentColor}" Opacity="0.2" />
     <SolidColorBrush x:Key="SystemAccentMediumLowBrush" Color="{DynamicResource SystemAccentColor}" Opacity="0.4" />
     <SolidColorBrush x:Key="SystemAccentMediumBrush" Color="{DynamicResource SystemAccentColor}" Opacity="0.6" />
@@ -29,4 +29,5 @@
             </DataTrigger>
         </Style.Triggers>
     </Style>
+
 </ResourceDictionary>

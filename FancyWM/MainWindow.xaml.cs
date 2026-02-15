@@ -36,6 +36,7 @@ using Strings = FancyWM.Resources.Strings;
 using System.Data;
 using System.Windows.Threading;
 using SystemParameters = FancyWM.Utilities.SystemParameters;
+using System.IO;
 
 namespace FancyWM
 {
@@ -256,6 +257,8 @@ namespace FancyWM
             Show();
 
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
+
+            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
         }
 
         private UnmanagedResourceGuard? ApplySystemParameters()

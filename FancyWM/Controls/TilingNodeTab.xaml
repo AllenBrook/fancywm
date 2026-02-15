@@ -7,6 +7,7 @@
              xmlns:ui="http://schemas.modernwpf.com/2019"
              xmlns:viewmodels="clr-namespace:FancyWM.ViewModels" 
              xmlns:res="clr-namespace:FancyWM.Resources"
+             xmlns:theme="clr-namespace:FancyWM.ThemeEngine.Wpf;assembly=FancyWM.ThemeEngine"
              d:DataContext="{d:DesignInstance Type=viewmodels:TilingNodeViewModel}"
              mc:Ignorable="d" 
              d:DesignHeight="18" d:DesignWidth="64">
@@ -46,7 +47,7 @@
                     </Setter.Value>
                 </Setter>
                 <Setter Property="OverridesDefaultStyle" Value="True"/>
-                <Setter Property="TextBlock.Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                <Setter Property="TextBlock.Foreground" Value="{theme:CssResource panel-bar-tab/color, As=Brush}" />
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -102,7 +103,7 @@
                 </Border>
 
                 <Image Grid.Column="1" Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Fill" Margin="0,1,5,1" Source="{Binding Icon}" Visibility="{Binding IconVisibility}" />
-                <local:TilingNodeCaptionBlock Grid.Column="2" MaxCharacters="12" FontSize="{DynamicResource OverlayFontSize}" DataContext="{Binding}" />
+                <local:TilingNodeCaptionBlock Grid.Column="2" MaxCharacters="10" FontSize="{DynamicResource OverlayFontSize}" DataContext="{Binding}" />
 
                 <Button Grid.Column="3" ToolTip="{x:Static res:Strings.Close}" Background="Transparent" Padding="0" Margin="0,0,2,0" Width="14" Height="14">
                     <Button.InputBindings>
