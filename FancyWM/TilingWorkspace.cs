@@ -152,48 +152,10 @@ namespace FancyWM
 
         public WindowNode RegisterWindow(IWindow window, int maxTreeWidth = 100)
         {
-            var state = m_states.FindByVdm(window) ?? throw new InvalidWindowReferenceException(window.Handle);
-            if (state.DesktopTree.FindNode(window) is WindowNode node)
-            {
-                throw new WindowAlreadyRegisteredException();
-            }
-
+            var state = GetValidatedState(window);
             var focusedNode = state.FocusedNode;
-
-            PanelNode parent;
-            if (focusedNode is WindowNode focusedWindow)
-            {
-                parent = focusedWindow.Parent ?? state.DesktopTree.Root!;
-            }
-            else
-            {
-                parent = state.DesktopTree.Root!;
-            }
-
-            if (parent.Children.Where(x => x is not PlaceholderNode).Count() >= maxTreeWidth && parent is SplitPanelNode parentSplit)
-            {
-                var nodeToSplit = parent.Children.Contains(focusedNode) ? focusedNode! : parent.Children.Last();
-                if (nodeToSplit is WindowNode)
-                {
-                    WrapInSplitPanel(nodeToSplit, vertical: parentSplit.Orientation == PanelOrientation.Horizontal);
-
-                    try
-                    {
-                        nodeToSplit.Desktop!.Arrange();
-                    }
-                    catch (UnsatisfiableFlexConstraintsException)
-                    {
-                        nodeToSplit.Parent!.CollapseIfSingle();
-                    }
-
-                    if (!CanFitLossy(nodeToSplit.Parent!, window))
-                    {
-                        nodeToSplit.Parent!.CollapseIfSingle();
-                    }
-                }
-                parent = nodeToSplit.Parent!;
-            }
-
+            var parent = ResolveParent(state, focusedNode);
+            parent = ResolveParentWithWidthConstraint(parent, focusedNode, window, maxTreeWidth);
             return RegisterWindow(window, parent, focusedNode as WindowNode);
         }
 
@@ -202,22 +164,76 @@ namespace FancyWM
             if (m_states.FindByTree(window) != null)
                 throw new WindowAlreadyRegisteredException();
 
-            WindowNode newNode = new(window);
-            // Try to fit in the same panel as the target
-            if (parent is StackPanelNode || CanFitLossy(parent, newNode))
-            {
-                parent.Attach(newNode);
-                parent.RemovePlaceholders();
-            }
-            else
-            {
-                throw new NoValidPlacementExistsException();
-            }
-
-            // It is important to use []= here, because the window might have been present on a different virtual desktop
-            // and added here before it is removed from there (I think).
+            var newNode = new WindowNode(window);
+            AttachToParent(newNode, parent);
             m_originalPositions[window] = window.Position;
             return newNode;
+        }
+
+        private DesktopState GetValidatedState(IWindow window)
+        {
+            var state = m_states.FindByVdm(window)
+                ?? throw new InvalidWindowReferenceException(window.Handle);
+
+            if (state.DesktopTree.FindNode(window) is WindowNode)
+                throw new WindowAlreadyRegisteredException();
+
+            return state;
+        }
+
+        private static PanelNode ResolveParent(DesktopState state, TilingNode? focusedNode)
+            => focusedNode is WindowNode focusedWindow
+                ? focusedWindow.Parent ?? state.DesktopTree.Root!
+                : state.DesktopTree.Root!;
+
+        private PanelNode ResolveParentWithWidthConstraint(
+            PanelNode parent, TilingNode? focusedNode, IWindow window, int maxTreeWidth)
+        {
+            if (!IsAtMaxWidth(parent, maxTreeWidth) || parent is not SplitPanelNode parentSplit)
+                return parent;
+
+            var nodeToSplit = SelectNodeToSplit(parent, focusedNode);
+
+            if (nodeToSplit is WindowNode)
+                TrySplitNode(nodeToSplit, parentSplit, window);
+
+            return nodeToSplit.Parent!;
+        }
+
+        private static bool IsAtMaxWidth(PanelNode parent, int maxTreeWidth)
+            => parent.Children.Count(x => x is not PlaceholderNode) >= maxTreeWidth;
+
+        private static TilingNode SelectNodeToSplit(PanelNode parent, TilingNode? focusedNode)
+            => parent.Children.Contains(focusedNode) ? focusedNode! : parent.Children.Last();
+
+        private void TrySplitNode(TilingNode nodeToSplit, SplitPanelNode parentSplit, IWindow window)
+        {
+            WrapInSplitPanel(nodeToSplit, vertical: parentSplit.Orientation == PanelOrientation.Horizontal);
+            ArrangeWithFallback(nodeToSplit);
+
+            if (!CanFitLossy(nodeToSplit.Parent!, window))
+                nodeToSplit.Parent!.CollapseIfSingle();
+        }
+
+        private static void ArrangeWithFallback(TilingNode node)
+        {
+            try
+            {
+                node.Desktop!.Arrange();
+            }
+            catch (UnsatisfiableFlexConstraintsException)
+            {
+                node.Parent!.CollapseIfSingle();
+            }
+        }
+
+        private void AttachToParent(WindowNode newNode, PanelNode parent)
+        {
+            if (parent is not StackPanelNode && !CanFitLossy(parent, newNode))
+                throw new NoValidPlacementExistsException();
+
+            parent.Attach(newNode);
+            parent.RemovePlaceholders();
         }
 
         private static bool CanFitLossy(PanelNode parent, IWindow window)
