@@ -58,6 +58,7 @@ namespace FancyWM
         private int m_autoSplitCount = 100;
 
         private bool m_delayReposition = false;
+        private bool m_autoFloatNewWindows = false;
 
         private void SetAutoCollapse(bool value)
         {
@@ -242,6 +243,7 @@ namespace FancyWM
                 m_animateWindowMovement = x.AnimateWindowMovement;
                 m_autoSplitCount = x.AutoSplitCount;
                 m_delayReposition = x.DelayReposition;
+                m_autoFloatNewWindows = x.AutoFloatNewWindows;
                 SetWindowPadding(x.WindowPadding);
                 SetPanelHeight(x.PanelHeight);
                 SetShowFocus(x.ShowFocus);

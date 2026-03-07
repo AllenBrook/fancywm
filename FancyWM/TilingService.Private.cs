@@ -1013,6 +1013,14 @@ namespace FancyWM
                     return;
                 }
 
+                if (m_autoFloatNewWindows)
+                {
+                    lock (m_floatingSet)
+                    {
+                        m_floatingSet.Add(e.Source);
+                    }
+                }
+
                 if (CanManage(e.Source) && e.Source.State == WindowState.Restored)
                 {
                     m_logger.Information("Window {Window} can be managed, registering with backend ({Display})", e.Source.DebugString(), m_display);

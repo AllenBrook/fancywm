@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 using System.Windows.Media;
 
 using FancyWM.Utilities;
-
-using Windows.Foundation.Diagnostics;
 
 namespace FancyWM.Models
 {
@@ -20,6 +17,7 @@ namespace FancyWM.Models
         bool ShowFocus { get; }
         bool AutoCollapsePanels { get; }
         bool DelayReposition { get; }
+        bool AutoFloatNewWindows { get; }
     }
 
     [AttributeUsage(AttributeTargets.Field)]
@@ -51,6 +49,7 @@ namespace FancyWM.Models
         public int AutoSplitCount { get; init; } = 2;
 
         public bool DelayReposition { get; init; } = true;
+        public bool AutoFloatNewWindows { get; init; } = false;
 
         public bool AnimateWindowMovement { get; init; } = true;
 
