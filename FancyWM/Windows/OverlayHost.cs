@@ -1,7 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,8 +7,9 @@ using System.Windows.Interop;
 using System.Windows.Media;
 
 using FancyWM.DllImports;
+using FancyWM.Utilities;
 
-using Windows.System;
+using Microsoft.Extensions.DependencyInjection;
 
 using WinMan;
 
@@ -21,7 +19,7 @@ namespace FancyWM.Windows
     /// This is basically a workaround for showing overlay content that is ignored by the operating system.
     /// It uses two identially-positioned windows, one with WS_EX_TRANSPARENT and one without.
     /// </summary>
-    class OverlayHost : DependencyObject
+    partial class OverlayHost : DependencyObject
     {
 
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
@@ -50,139 +48,6 @@ namespace FancyWM.Windows
             DoNotActivate = 0x0010,
             DoNotSendChangingEvent = 0x0400,
             AsynchronousWindowPosition = 0x4000,
-        }
-
-        private class OverlayWindow : Window
-        {
-            private readonly IDisplay m_display;
-            private readonly Border m_contentContainer;
-            private readonly IDisposable m_subscription;
-            private readonly IntPtr m_hwnd;
-            private int m_panelFontSize;
-
-            public bool AllowClose { get; set; } = false;
-
-            public OverlayWindow(IDisplay display)
-            {
-                m_display = display;
-                var bounds = display.Bounds;
-
-                WindowStyle = WindowStyle.None;
-                ResizeMode = ResizeMode.NoResize;
-                Topmost = true;
-                ShowInTaskbar = false;
-                AllowsTransparency = true;
-                Background = null;
-
-                m_hwnd = new WindowInteropHelper(this).EnsureHandle();
-                m_contentContainer = new Border();
-                Content = m_contentContainer;
-                UpdateRenderTransform();
-
-                m_display.WorkAreaChanged += OnDisplayWorkAreaChanged;
-                m_display.ScalingChanged += OnDisplayScalingChanged;
-
-                m_subscription = App.Current.AppState.Settings
-                    .Select(x => x.PanelFontSize)
-                    .DistinctUntilChanged()
-                    .Subscribe(x =>
-                    {
-                        m_panelFontSize = x;
-                        _ = Dispatcher.InvokeAsync(() =>
-                        {
-                            Resources["DisplayScaling"] = m_display.Scaling;
-                            Resources["OverlayFontSize"] = m_panelFontSize * m_display.Scaling;
-                        });
-                    });
-            }
-
-            protected override void OnClosing(CancelEventArgs e)
-            {
-                if (!AllowClose)
-                {
-                    e.Cancel = true;
-                }
-            }
-
-            internal void SetContent(Control content)
-            {
-                m_contentContainer.Child = content;
-            }
-
-            private Rectangle? GetWindowRectangle()
-            {
-                if (PInvoke.GetWindowRect(new(m_hwnd), out RECT current))
-                {
-                    return new Rectangle(current.left, current.top, current.right, current.bottom);
-                }
-                return default;
-            }
-
-            private void EnsureLocation()
-            {
-                var current = GetWindowRectangle();
-                var desired = m_display.WorkArea;
-                if (current != desired)
-                {
-                    PInvoke.SetWindowPos(new(m_hwnd), new(), desired.Left, desired.Top, desired.Width, desired.Height,
-                        SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
-                }
-            }
-
-            private void UpdateRenderTransform()
-            {
-                EnsureLocation();
-                var bounds = m_display.Bounds;
-                var workArea = m_display.WorkArea;
-
-                var tg = new TransformGroup();
-                tg.Children.Add(new TranslateTransform(
-                    bounds.Left - workArea.Left,
-                    bounds.Top - workArea.Top));
-                tg.Children.Add(new ScaleTransform(
-                        1 / m_display.Scaling,
-                        1 / m_display.Scaling));
-                m_contentContainer.RenderTransform = tg;
-            }
-
-            private void OnDisplayScalingChanged(object? sender, DisplayScalingChangedEventArgs e)
-            {
-                Dispatcher.BeginInvoke(() =>
-                {
-                    UpdateRenderTransform();
-                    Resources["DisplayScaling"] = m_display.Scaling;
-                    Resources["OverlayFontSize"] = m_panelFontSize * m_display.Scaling;
-                });
-            }
-
-            private void OnDisplayWorkAreaChanged(object? sender, DisplayRectangleChangedEventArgs e)
-            {
-                Dispatcher.BeginInvoke(() =>
-                {
-                    UpdateRenderTransform();
-                });
-            }
-
-            protected override void OnLocationChanged(EventArgs e)
-            {
-                base.OnLocationChanged(e);
-                EnsureLocation();
-            }
-
-            protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
-            {
-                base.OnRenderSizeChanged(sizeInfo);
-                EnsureLocation();
-            }
-
-            protected override void OnClosed(EventArgs e)
-            {
-                base.OnClosed(e);
-                m_subscription?.Dispose();
-                m_display.WorkAreaChanged -= OnDisplayWorkAreaChanged;
-                m_display.ScalingChanged -= OnDisplayScalingChanged;
-                Content = null;
-            }
         }
 
         public static readonly DependencyProperty NonHitTestableContentProperty = DependencyProperty.Register(
@@ -216,6 +81,7 @@ namespace FancyWM.Windows
         private readonly OverlayWindow m_nonHitTestableWindow;
         private readonly IntPtr m_hwnd;
         private readonly IntPtr m_nonHitTestableHwnd;
+        private readonly LowLevelMouseHook? m_mshk;
         private bool m_isShown;
 
         public OverlayHost(IDisplay display)
@@ -248,6 +114,15 @@ namespace FancyWM.Windows
             UpdatePositions();
 
             display.Workspace.CursorLocationChanged += OnCursorLocationChanged;
+            display.Workspace.FocusedWindowChanged += OnFocusedWindowChanged;
+            display.Workspace.WindowAdded += OnWindowAdded;
+            display.Workspace.WindowRemoved += OnWindowRemoved;
+
+            if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
+            {
+                m_mshk = mshk;
+                m_mshk.ButtonStateChanged += OnMouseButtonStateChanged;
+            }
         }
 
         public void Show()
@@ -263,7 +138,7 @@ namespace FancyWM.Windows
                 while (m_isShown)
                 {
                     UpdatePositions();
-                    await Task.Delay(250);
+                    await Task.Delay(1000);
                 }
             }
             UpdateLoop();
@@ -281,6 +156,13 @@ namespace FancyWM.Windows
             m_isShown = false;
             AnchorSource = null;
             m_display.Workspace.CursorLocationChanged -= OnCursorLocationChanged;
+            m_display.Workspace.FocusedWindowChanged -= OnFocusedWindowChanged;
+            m_display.Workspace.WindowAdded -= OnWindowAdded;
+            m_display.Workspace.WindowRemoved -= OnWindowRemoved;
+            if (m_mshk != null)
+            {
+                m_mshk.ButtonStateChanged -= OnMouseButtonStateChanged;
+            }
             Dispatcher.Invoke(() =>
             {
                 m_nonHitTestableWindow.Visibility = Visibility.Collapsed;
@@ -361,6 +243,34 @@ namespace FancyWM.Windows
             if (oldValue != newValue)
             {
                 _ = SetWindowLongPtr(new(hwnd), GetWindowLongPtr_nIndex.GWL_STYLE, newValue);
+            }
+        }
+
+        private void OnWindowRemoved(object? sender, WindowChangedEventArgs e)
+        {
+            DispatchUpdatePositions();
+        }
+
+        private void OnWindowAdded(object? sender, WindowChangedEventArgs e)
+        {
+            DispatchUpdatePositions();
+        }
+
+        private void OnFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
+        {
+            DispatchUpdatePositions();
+        }
+
+        private void OnMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
+        {
+            DispatchUpdatePositions();
+        }
+
+        private void DispatchUpdatePositions()
+        {
+            if (m_isShown)
+            {
+                Dispatcher.BeginInvoke(() => UpdatePositions());
             }
         }
 
