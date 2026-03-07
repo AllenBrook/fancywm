@@ -19,7 +19,6 @@ using WinMan.Windows;
 using FancyWM.Controls;
 using ModernWpf;
 using Hardcodet.Wpf.TaskbarNotification;
-using Windows.System;
 using System.Reactive.Disposables;
 using System.Reactive;
 using Serilog;
@@ -304,6 +303,11 @@ namespace FancyWM
         {
             if (e.NewFocusedWindow != null)
             {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    m_contextMenu.IsOpen = false;
+                });
+
                 var currentDisplay = m_workspace.DisplayManager.Displays.FirstOrDefault(x => x.Bounds.Contains(e.NewFocusedWindow.Position.Center));
                 if (currentDisplay != null)
                 {
