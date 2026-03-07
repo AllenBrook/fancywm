@@ -98,6 +98,27 @@ The consequence: **Layouts never break due to application constraints.** Each wi
 
 Binary Space Partitioning (BSP) divides space recursively into two regions with each split, which can create inefficient layouts or require manual rebalancing. FancyWM's equal-space approach is simpler to reason about and automatically adapts to changing window counts.
 
+## Native theme engine (in preview)
+
+FancyWM v2.19 adds support for custom theming using CSS. This is built using native platform API and does not use WebViews/Chromium, so it is fast and low-overhead.
+
+There is a lot more work needed to polish and improve this feature, so consider contributing or donating to the development.
+
+See some examples here: https://github.com/FancyWM/fancywm/pull/444#issuecomment-4016018314
+
+```
+panel-bar {
+    border-color: white;
+    border-width: 1px;
+    border-radius: 12px;
+    filter: drop-shadow(0px 0px 8px white);
+    background-image: linear-gradient(30deg,
+            red 0%, blue 20%, green 40%, green 60%, orange 60%);
+}
+```
+
+<img width="380" height="200" alt="Screenshot" src="https://github.com/user-attachments/assets/364ef9ac-340a-4fe9-a6e3-ae05273dcf53" />
+
 ## [Downloads](https://github.com/FancyWM/fancywm/releases)
 
 Pre-built binaries can be downloaded from [Releases](https://github.com/FancyWM/fancywm/releases).
