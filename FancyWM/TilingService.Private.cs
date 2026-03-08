@@ -99,15 +99,15 @@ namespace FancyWM
             }
             m_lastUpdateLayout = m_sw.Elapsed;
 
+            IVirtualDesktop desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+
             List<TilingNode> snapshot;
             IReadOnlyCollection<TilingNode> focusedPath;
             TilingNode? focusedNode;
-            IVirtualDesktop desktop;
             DesktopTree tree;
 
             using (m_backendLock.EnterScope())
             {
-                desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
                 try
                 {
                     var treeOrNull = m_backend.GetTree(desktop);
@@ -434,11 +434,14 @@ namespace FancyWM
                 {
                     return new IntPtr(0);
                 }
+            }
 
+            var comparer = m_workspace.CreateSnapshotZOrderComparer();
+            using (m_backendLock.EnterScope())
+            {
                 var tree = m_backend.GetTree(desktop);
                 if (tree == null)
                     return new IntPtr(0);
-                var comparer = m_workspace.CreateSnapshotZOrderComparer();
                 var topWindow = tree.Root!.Windows
                     .OrderByDescending(x => x.WindowReference, comparer)
                     .FirstOrDefault();
