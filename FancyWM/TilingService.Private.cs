@@ -20,7 +20,7 @@ namespace FancyWM
     {
         private void RestoreOriginalLayout()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 foreach (var desktop in m_workspace.VirtualDesktopManager.Desktops)
                 {
@@ -78,7 +78,7 @@ namespace FancyWM
                 {
                     var largestWindow = tree.Root!.Windows.OrderByDescending(x => x.GenerationID).First();
                     m_logger.Warning($"The arrange pass failed! Floating window {largestWindow.WindowReference.DebugString()} in an attempt to find a permissible arrangement!");
-                    lock (m_floatingSet)
+                    using (m_floatingSetLock.EnterScope())
                     {
                         m_floatingSet.Add(largestWindow.WindowReference);
                     }
@@ -105,7 +105,7 @@ namespace FancyWM
             IVirtualDesktop desktop;
             DesktopTree tree;
 
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
                 try
@@ -134,7 +134,7 @@ namespace FancyWM
                 {
                     Freeze();
                     IList<WindowNode> snapshotWindows;
-                    lock (m_ignoreRepositionSet)
+                    using (m_ignoreRepositionSetLock.EnterScope())
                     {
                         snapshotWindows = snapshot.OfType<WindowNode>().Where(x => !m_ignoreRepositionSet.Contains(x.WindowReference)).ToList();
                     }
@@ -193,7 +193,7 @@ namespace FancyWM
             }
 
             HashSet<IWindow>? newWindows = null;
-            lock (m_newWindowSet)
+            using (m_newWindowSetLock.EnterScope())
             {
                 if (m_newWindowSet.Count > 0)
                 {
@@ -322,7 +322,7 @@ namespace FancyWM
                             return null;
                         }
 
-                        lock (m_backend)
+                        using (m_backendLock.EnterScope())
                         {
                             if (m_backend.HasWindow(window))
                             {
@@ -332,7 +332,7 @@ namespace FancyWM
                     }
                     else
                     {
-                        lock (m_backend)
+                        using (m_backendLock.EnterScope())
                         {
                             var rect = m_backend.MockMoveNode(m_movingPanelNode, pt, allowNesting: !isSwapping).preArrange;
                             var padding = GetPanelPaddingRect();
@@ -359,7 +359,7 @@ namespace FancyWM
         {
             try
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     m_backend.PullUp(node);
                 }
@@ -376,7 +376,7 @@ namespace FancyWM
         {
             try
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     m_backend.WrapInSplitPanel(node, vertical);
                     m_backend.SetFocus(node);
@@ -403,7 +403,7 @@ namespace FancyWM
         {
             try
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     m_backend.WrapInStackPanel(node);
                     node.Parent!.Padding = GetPanelPaddingRect();
@@ -422,7 +422,7 @@ namespace FancyWM
         private IntPtr GetOverlayAnchor()
         {
             var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 try
                 {
@@ -453,7 +453,7 @@ namespace FancyWM
         private void ToggleFloat(IWindow window)
         {
             bool floated;
-            lock (m_floatingSet)
+            using (m_floatingSetLock.EnterScope())
             {
                 if (m_floatingSet.Contains(window))
                 {
@@ -475,7 +475,7 @@ namespace FancyWM
             {
                 try
                 {
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         m_backend.SetFocus(window);
                     }
@@ -495,7 +495,7 @@ namespace FancyWM
         {
             if (e.FailReason == TilingError.NoValidPlacementExists && e.FailSource != null)
             {
-                lock (m_floatingSet)
+                using (m_floatingSetLock.EnterScope())
                 {
                     m_floatingSet.Add(e.FailSource);
                 }
@@ -508,7 +508,7 @@ namespace FancyWM
             Rectangle? originalPosition;
             try
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     originalPosition = m_backend.GetOriginalPosition(window);
                 }
@@ -571,7 +571,7 @@ namespace FancyWM
                         PendingIntent = null;
                     }
 
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         if (m_backend.NodeAtPoint(m_workspace.VirtualDesktopManager.CurrentDesktop, e.NewLocation) is WindowNode targetNode)
                         {
@@ -645,7 +645,7 @@ namespace FancyWM
 
                 WindowNode sourceNode;
                 PanelNode panel;
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     var node = m_backend.NodeAtPoint(m_workspace.VirtualDesktopManager.CurrentDesktop, cursorPosition);
                     if (node is not WindowNode targetNode)
@@ -710,7 +710,7 @@ namespace FancyWM
 
 
                 BindEventHandlers(sourceNode.WindowReference);
-                lock (m_windowSet)
+                using (m_windowSetLock.EnterScope())
                 {
                     m_windowSet.Add(sourceNode.WindowReference);
                 }
@@ -721,7 +721,7 @@ namespace FancyWM
                     {
                         try
                         {
-                            lock (m_backend)
+                            using (m_backendLock.EnterScope())
                             {
                                 var node = m_backend.RegisterWindow(sourceNode.WindowReference, panel);
                                 m_backend.SetFocus(node);
@@ -849,7 +849,7 @@ namespace FancyWM
             {
                 var isSwapping = IsSwapModifierPressed();
                 var pt = m_workspace.CursorLocation;
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     // Check that panel hasn't disappeared during the move.
                     if (panel.Desktop == null)
@@ -880,7 +880,7 @@ namespace FancyWM
         {
             m_logger.Information("Desktop {Desktop} added to workspace", e.Source);
             var orientation = m_display.Bounds.Width >= m_display.Bounds.Height ? PanelOrientation.Horizontal : PanelOrientation.Vertical;
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 m_backend.RegisterDesktop(e.Source, m_display.WorkArea, orientation);
             }
@@ -889,7 +889,7 @@ namespace FancyWM
         private void OnDesktopRemoved(object? sender, DesktopChangedEventArgs e)
         {
             m_logger.Information("Desktop {Desktop} removed from workspace", e.Source);
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 m_backend.UnregisterDesktop(e.Source);
             }
@@ -909,7 +909,7 @@ namespace FancyWM
                 try
                 {
                     bool hideMaximised = false;
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         if (m_backend.HasWindow(e.Source))
                         {
@@ -972,7 +972,7 @@ namespace FancyWM
 
             //SilenceExceptionIfDead(() =>
             //{
-            //    lock (m_backend)
+            //    using (m_backendLock.EnterScope())
             //    {
             //        if (m_backend.HasWindow(e.Source))
             //        {
@@ -991,18 +991,18 @@ namespace FancyWM
             try
             {
                 BindEventHandlers(e.Source);
-                lock (m_windowSet)
+                using (m_windowSetLock.EnterScope())
                 {
                     m_windowSet.Add(e.Source);
                 }
-                lock (m_newWindowSet)
+                using (m_newWindowSetLock.EnterScope())
                 {
                     m_newWindowSet.Add(e.Source);
                 }
 
                 if (m_exclusionMatchers.Any(x => x.Matches(e.Source)))
                 {
-                    lock (m_floatingSet)
+                    using (m_floatingSetLock.EnterScope())
                     {
                         m_floatingSet.Add(e.Source);
                     }
@@ -1015,7 +1015,7 @@ namespace FancyWM
 
                 if (m_autoFloatNewWindows)
                 {
-                    lock (m_floatingSet)
+                    using (m_floatingSetLock.EnterScope())
                     {
                         m_floatingSet.Add(e.Source);
                     }
@@ -1030,7 +1030,7 @@ namespace FancyWM
                         {
                             try
                             {
-                                lock (m_backend)
+                                using (m_backendLock.EnterScope())
                                 {
                                     if (m_backend.HasWindow(e.Source))
                                     {
@@ -1068,15 +1068,15 @@ namespace FancyWM
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
             UnbindEventHandlers(e.Source);
-            lock (m_savedLocations)
+            using (m_savedLocationsLock.EnterScope())
             {
                 m_savedLocations.Remove(e.Source);
             }
-            lock (m_ignoreRepositionSet)
+            using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
             }
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 if (m_backend.HasWindow(e.Source))
                 {
@@ -1085,15 +1085,15 @@ namespace FancyWM
                     InvalidateLayout();
                 }
             }
-            lock (m_floatingSet)
+            using (m_floatingSetLock.EnterScope())
             {
                 m_floatingSet.Remove(e.Source);
             }
-            lock (m_newWindowSet)
+            using (m_newWindowSetLock.EnterScope())
             {
                 m_newWindowSet.Remove(e.Source);
             }
-            lock (m_windowSet)
+            using (m_windowSetLock.EnterScope())
             {
                 m_windowSet.Remove(e.Source);
             }
@@ -1103,7 +1103,7 @@ namespace FancyWM
         {
             var isSwapping = IsSwapModifierPressed();
             var pt = m_workspace.CursorLocation;
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 if (m_backend.HasWindow(window))
                 {
@@ -1136,7 +1136,7 @@ namespace FancyWM
 
             m_logger.Information("Window {Window} move ended", e.Source.DebugString());
             InvalidateLayout();
-            lock (m_ignoreRepositionSet)
+            using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
             }
@@ -1162,7 +1162,7 @@ namespace FancyWM
             }
             m_lastWindowPositionChanged = m_sw.Elapsed;
 
-            lock (m_ignoreRepositionSet)
+            using (m_ignoreRepositionSetLock.EnterScope())
             {
                 if (!m_ignoreRepositionSet.Contains(e.Source))
                 {
@@ -1173,7 +1173,7 @@ namespace FancyWM
                 }
             }
 
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 if (!m_backend.HasWindow(e.Source))
                 {
@@ -1211,7 +1211,7 @@ namespace FancyWM
                 }
                 else
                 {
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         if (m_backend.HasWindow(e.Source))
                         {
@@ -1274,12 +1274,12 @@ namespace FancyWM
 
             void UnregisterAndSaveLocation()
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     var window = m_backend.FindWindow(e.Source);
                     if (window != null)
                     {
-                        lock (m_savedLocations)
+                        using (m_savedLocationsLock.EnterScope())
                         {
                             // Be resilient to multiple OnWindowStateChanged events happening one after the other
                             m_savedLocations[e.Source] = new NodeLocation(window);
@@ -1294,7 +1294,7 @@ namespace FancyWM
             void RegisterAndRestoreLocation()
             {
                 NodeLocation? savedLocation;
-                lock (m_savedLocations)
+                using (m_savedLocationsLock.EnterScope())
                 {
                     if (m_savedLocations.TryGetValue(e.Source, out savedLocation))
                     {
@@ -1376,7 +1376,7 @@ namespace FancyWM
 
                 try
                 {
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         if (savedLocation?.Parent?.Desktop != null)
                         {
@@ -1457,7 +1457,7 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            lock (m_ignoreRepositionSet)
+            using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Add(e.Source);
             }
@@ -1466,7 +1466,7 @@ namespace FancyWM
 
         private void OnTilingNodeFocusRequested(object? sender, TilingNode e)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var windowNode = e.Windows.FirstOrDefault();
                 try
@@ -1558,7 +1558,7 @@ namespace FancyWM
 
                     try
                     {
-                        lock (m_backend)
+                        using (m_backendLock.EnterScope())
                         {
                             try
                             {
@@ -1587,7 +1587,7 @@ namespace FancyWM
                 }
                 else
                 {
-                    lock (m_backend)
+                    using (m_backendLock.EnterScope())
                     {
                         if (m_backend.HasWindow(window))
                         {
@@ -1627,7 +1627,7 @@ namespace FancyWM
             }
             bool IsFloating()
             {
-                lock (m_floatingSet)
+                using (m_floatingSetLock.EnterScope())
                 {
                     return m_floatingSet.Contains(x);
                 }
@@ -1751,7 +1751,7 @@ namespace FancyWM
 
         private void PropagatePaddingChange()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 foreach (var panel in m_backend.Trees.SelectMany(x => x.Root!.Nodes).OfType<PanelNode>())
                 {
@@ -1763,7 +1763,7 @@ namespace FancyWM
 
         private void PropagatePanelHeightChange()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 foreach (var panel in m_backend.Trees.SelectMany(x => x.Root!.Nodes).OfType<PanelNode>())
                 {
@@ -1788,7 +1788,7 @@ namespace FancyWM
         {
             try
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     m_backend.GetFocusAndAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
                     return true;

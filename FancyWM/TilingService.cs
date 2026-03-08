@@ -14,6 +14,12 @@ using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Diagnostics;
 
+#if DEBUG
+using Lock = FancyWM.Utilities.DebugLock;
+#else
+using Lock = System.Threading.Lock;
+#endif
+
 namespace FancyWM
 {
     /// <summary>
@@ -102,13 +108,13 @@ namespace FancyWM
             {
                 m_exclusionMatchers = [.. value];
 
-                lock (m_windowSet)
+                using (m_windowSetLock.EnterScope())
                 {
                     foreach (var window in m_windowSet)
                     {
                         if (m_exclusionMatchers.Any(x => x.Matches(window)))
                         {
-                            lock (m_floatingSet)
+                            using (m_floatingSetLock.EnterScope())
                             {
                                 m_floatingSet.Add(window);
                             }
@@ -133,6 +139,7 @@ namespace FancyWM
         }
 
         private static readonly IReadOnlySet<IWindow> EmptyWindowSet = new HashSet<IWindow>();
+        private static readonly TimeSpan LockThreshold = TimeSpan.FromMilliseconds(10);
 
         /// <summary>
         /// The dispatcher from the thread that created the <see cref="TilingService"/>
@@ -143,13 +150,25 @@ namespace FancyWM
         private IReadOnlyCollection<IWindowMatcher> m_exclusionMatchers = [];
 
         private readonly TilingOverlayRenderer m_gui;
-        private readonly TilingWorkspace m_backend;
         private readonly IDisplay m_display;
+
+        private readonly TilingWorkspace m_backend;
+        private readonly Utilities.DebugLock m_backendLock = new(LockThreshold);
+
         private readonly HashSet<IWindow> m_newWindowSet = [];
+        private readonly Utilities.DebugLock m_newWindowSetLock = new(LockThreshold);
+
         private readonly HashSet<IWindow> m_windowSet = [];
+        private readonly Utilities.DebugLock m_windowSetLock = new(LockThreshold);
+
         private readonly HashSet<IWindow> m_floatingSet = [];
+        private readonly Utilities.DebugLock m_floatingSetLock = new(LockThreshold);
+
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
+        private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
+
         private readonly Dictionary<IWindow, NodeLocation> m_savedLocations = [];
+        private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
@@ -272,7 +291,7 @@ namespace FancyWM
 
         public void MoveFocus(TilingDirection direction)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var adjacentWindow = m_backend.GetFocusAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
                 if (FocusHelper.ForceActivate(adjacentWindow.WindowReference.Handle))
@@ -291,7 +310,7 @@ namespace FancyWM
 
         public void MoveWindow(TilingDirection direction)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 WindowNode? adjacentWindow = focusedNode.GetAdjacentWindow(direction) ?? throw new TilingFailedException(TilingError.MissingAdjacentWindow);
@@ -327,7 +346,7 @@ namespace FancyWM
 
         public void SwapFocus(TilingDirection direction)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 (var currentWindow, var adjacentWindow) = m_backend.GetFocusAndAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
                 currentWindow!.Swap(adjacentWindow);
@@ -343,7 +362,7 @@ namespace FancyWM
             }
 
             List<IWindow> windows;
-            lock (m_windowSet)
+            using (m_windowSetLock.EnterScope())
             {
                 windows = [.. m_windowSet];
             }
@@ -351,7 +370,7 @@ namespace FancyWM
             bool anyChanges = false;
             foreach (var window in windows)
             {
-                lock (m_backend)
+                using (m_backendLock.EnterScope())
                 {
                     try
                     {
@@ -384,7 +403,7 @@ namespace FancyWM
         public void Refresh()
         {
             List<IWindow> windows;
-            lock (m_windowSet)
+            using (m_windowSetLock.EnterScope())
             {
                 windows = [.. m_windowSet];
             }
@@ -405,7 +424,7 @@ namespace FancyWM
 
             List<IWindow> movedWindows = [];
 
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 foreach (var desktop in m_workspace.VirtualDesktopManager.Desktops)
                 {
@@ -436,7 +455,7 @@ namespace FancyWM
 
         public bool CanSplit(bool vertical)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 return focusedNode != null && CanSplit(focusedNode);
@@ -445,7 +464,7 @@ namespace FancyWM
 
         public void Split(bool vertical)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 WrapInSplitPanel(focusedNode, vertical);
@@ -472,7 +491,7 @@ namespace FancyWM
 
         public bool CanStack()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 return focusedNode != null && CanStack(focusedNode);
@@ -481,7 +500,7 @@ namespace FancyWM
 
         public void Stack()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 if (focusedNode == null || focusedNode.Parent == null)
@@ -493,7 +512,7 @@ namespace FancyWM
 
         public bool CanPullUp()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 return focusedNode != null && focusedNode.Parent != focusedNode.Desktop!.Root;
@@ -502,7 +521,7 @@ namespace FancyWM
 
         public void PullUp()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 MoveToParentPanel(focusedNode);
@@ -569,7 +588,7 @@ namespace FancyWM
             m_display.ScalingChanged -= OnDisplayScalingChanged;
 
             // There is still the possibility that OnWindowAdded gets called, but hopefully that does not happen too often.
-            lock (m_windowSet)
+            using (m_windowSetLock.EnterScope())
             {
                 foreach (var window in m_windowSet)
                 {
@@ -580,7 +599,7 @@ namespace FancyWM
 
         public bool CanResize(PanelOrientation orientation, double displayPercentage)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 if (focusedNode is not WindowNode focusedWindow)
@@ -621,7 +640,7 @@ namespace FancyWM
 
         public void Resize(PanelOrientation orientation, double displayPercentage)
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 if (focusedNode is not WindowNode focusedWindow)
@@ -645,7 +664,7 @@ namespace FancyWM
 
         public IWindow? GetFocus()
         {
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 if (focusedNode is not WindowNode focusedWindow)
@@ -667,7 +686,7 @@ namespace FancyWM
                 return Math.Pow(point1.X - point2.X, 2) + Math.Pow(point1.Y - point2.Y, 2);
             }
 
-            lock (m_backend)
+            using (m_backendLock.EnterScope())
             {
                 var tree = m_backend.GetTree(m_workspace.VirtualDesktopManager.CurrentDesktop);
                 var closestNode = tree!.Root!.Windows
