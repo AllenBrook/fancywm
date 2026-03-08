@@ -67,9 +67,10 @@ namespace FancyWM.Utilities
                 MaxLockTime = elapsed;
             }
             scope.LockScope.Dispose();
-            if (elapsed > MaxExpectedLockTime && scope.LockTime >= s_minSteadyTime && Debugger.IsAttached)
+            if (elapsed > MaxExpectedLockTime && scope.LockTime >= s_minSteadyTime)
             {
-                Debugger.Break();
+                var frame = new StackTrace().GetFrame(2);
+                App.Current.Logger.Information($"Critical section exited after {elapsed.TotalMilliseconds}ms at {frame} above threshold of {MaxExpectedLockTime.TotalMilliseconds}ms");
             }
         }
     }
