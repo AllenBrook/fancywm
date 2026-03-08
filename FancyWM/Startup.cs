@@ -168,6 +168,8 @@ Type 'FancyWM --help' from anywhere after installation.
             var logger = provider.GetRequiredService<ILogger>();
             logger.Warning($"FancyWM v{GetVersionString()} (https://www.microsoft.com/store/apps/9P1741LKHQS9) on {Environment.OSVersion}");
 
+            ConfigureThreadPriority(logger);
+
             bool exitNormally = false;
             try
             {
@@ -199,6 +201,36 @@ Type 'FancyWM --help' from anywhere after installation.
                     CrashCleanup?.Invoke();
                     ProgramExit?.Invoke();
                 }
+            }
+        }
+
+        private static void ConfigureThreadPriority(ILogger logger)
+        {
+            try
+            {
+                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to update process priority");
+            }
+
+            try
+            {
+                Process.GetCurrentProcess().PriorityBoostEnabled = true;
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to enable process priority boost");
+            }
+
+            try
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to increase main thread priority");
             }
         }
 
