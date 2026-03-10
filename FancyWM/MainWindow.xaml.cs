@@ -78,6 +78,7 @@ namespace FancyWM
         private DateTime m_reviewTooltipShown;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
+        private bool m_checkForUpdates;
         private readonly Stopwatch m_stopwatch;
         private readonly IMicaProvider m_micaProvider;
         private readonly ModifierWindowMover m_mvm;
@@ -121,6 +122,7 @@ namespace FancyWM
                 .Do(x => m_enableRateReviewRequests = x.RemindToRateReview)
                 .Do(x => m_showContextHints = x.ShowContextHints)
                 .Do(x => m_soundOnFailure = x.SoundOnFailure)
+                .Do(x => m_checkForUpdates = x.CheckForUpdates)
                 .Do(x => m_showFocusDuringAction = x.ShowFocusDuringAction)
                 .Do(x => m_notifyVirtualDesktopServiceIncompatibility = x.NotifyVirtualDesktopServiceIncompatibility)
                 .Do(x =>
@@ -356,6 +358,68 @@ namespace FancyWM
                 {
                     m_logger.Warning("Unsupported OS Version: " + Environment.OSVersion.Version.ToString());
                 }
+            }
+
+            if (App.Current.Services.GetService<ReleaseChecker>() is ReleaseChecker releaseChecker)
+            {
+                _ = Dispatcher.BeginInvoke(async () =>
+                {
+                    try
+                    {
+                        await UpdateCheckLoopAsync(releaseChecker);
+                    }
+                    catch (Exception e)
+                    {
+                        m_logger.Error(e, "Update check loop failed!");
+                    }
+                });
+            }
+        }
+
+        private async Task UpdateCheckLoopAsync(ReleaseChecker releaseChecker)
+        {
+            while (m_checkForUpdates)
+            {
+                if (ShouldCheckForUpdatesToday())
+                {
+                    await CheckForUpdatesAsync(releaseChecker);
+                }
+                await Task.Delay(TimeSpan.FromHours(3));
+            }
+        }
+
+        private async Task CheckForUpdatesAsync(ReleaseChecker releaseChecker)
+        {
+            try
+            {
+                var latestVersion = await releaseChecker.GetLatestStableVersionAsync("fancywm", "FancyWM");
+                var currentVersion = new Version(App.Current.VersionString);
+                if (latestVersion > currentVersion)
+                {
+                    await ShowToastAsync($"{Strings.Messages_NewerVersionAvailable}: {latestVersion}", ToastDurationLong);
+                }
+            }
+            catch (Exception ex)
+            {
+                m_logger.Error(ex, "Update check failed!");
+            }
+        }
+
+        private bool ShouldCheckForUpdatesToday()
+        {
+#if DEBUG
+            return true;
+#endif
+            int getBucket(int dayOfYear) => (dayOfYear * 13) % 5;
+            try
+            {
+                var installDayOfYear = File.GetCreationTime(App.Current.AppState.Settings.FullPath).DayOfYear;
+                var todayDayOfYear = DateTime.Now.DayOfYear;
+                return getBucket(installDayOfYear) == getBucket(todayDayOfYear);
+            }
+            catch
+            {
+                return true;
             }
         }
 

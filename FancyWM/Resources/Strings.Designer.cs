@@ -2131,6 +2131,15 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to A newer version is available.
+        /// </summary>
+        public static string Messages_NewerVersionAvailable {
+            get {
+                return ResourceManager.GetString("Messages.NewerVersionAvailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to No focused window!.
         /// </summary>
         public static string Messages_NoFocusedWindow {

@@ -259,6 +259,7 @@ Type 'FancyWM --help' from anywhere after installation.
             services.AddSingleton<IMicaProvider>(_ => new FauxMicaProvider(TimeSpan.FromSeconds(1)));
             services.AddSingleton(_ => new LowLevelMouseHook());
             services.AddSingleton(_ => new LowLevelKeyboardHook());
+            services.AddSingleton(_ => new ReleaseChecker());
         }
 
         private static void ConfigureLogging(IServiceCollection services, Arguments args)

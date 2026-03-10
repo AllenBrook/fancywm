@@ -93,5 +93,7 @@ namespace FancyWM.Models
         public bool MultiMonitorSupport { get; init; } = true;
 
         public bool SoundOnFailure { get; init; } = true;
+
+        public bool CheckForUpdates { get; init; } = true;
     }
 }

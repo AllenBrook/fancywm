@@ -970,4 +970,7 @@ If you are running a supported non-Insider Windows build and you see this messag
   <data name="Interaction.MouseAutoFocus.Description" xml:space="preserve">
     <value>Change which window is focused without clicking. Enables the built-in Windows feature called "Activate on hover".</value>
   </data>
+  <data name="Messages.NewerVersionAvailable" xml:space="preserve">
+    <value>A newer version is available</value>
+  </data>
 </root>
