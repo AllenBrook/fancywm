@@ -11,6 +11,7 @@
 > "Multi-tasking made easier" - [XDA Developers](https://www.xda-developers.com/tiling-window-managers-arent-just-linux-these-best-options-windows/) <!-- https://web.archive.org/web/20260130081806/https://www.xda-developers.com/tiling-window-managers-arent-just-linux-these-best-options-windows/ -->
 
 [![Gitter](https://badges.gitter.im/FancyWM/community.svg)](https://gitter.im/FancyWM/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FancyWM/fancywm)
 
 **FancyWM** is a dynamic tiling window manager for Windows 10/11 that brings the productivity of tiling windows to the Windows desktop - **without complex configuration** and without sacrificing the familiar **mouse-and-keyboard interactions** most users expect.
 
