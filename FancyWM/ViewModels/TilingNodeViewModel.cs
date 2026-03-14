@@ -11,6 +11,7 @@ namespace FancyWM.ViewModels
 {
     public abstract class TilingNodeViewModel : ViewModelBase
     {
+        private TilingOverlayViewModel? m_overlay;
         private TilingNode? m_node;
         private bool m_hasFocus;
         private Rectangle m_windowBounds;
@@ -40,6 +41,7 @@ namespace FancyWM.ViewModels
             PullUpCommand = new DelegateCommand(_ => PullUpActionPressed?.Invoke(this, new RoutedEventArgs()));
         }
 
+        public TilingOverlayViewModel? Overlay { get => m_overlay; set => SetField(ref m_overlay, value); }
         public TilingNode? Node { get => m_node; set => SetField(ref m_node, value); }
         public bool HasFocus { get => m_hasFocus; set => SetField(ref m_hasFocus, value); }
         public Rectangle ComputedBounds { get => m_windowBounds; set => SetField(ref m_windowBounds, value); }

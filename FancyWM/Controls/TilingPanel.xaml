@@ -123,17 +123,17 @@
                             </StackPanel>
                         </Border>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_CreateHorizontalPanel_Caption}" Command="{Binding HorizontalSplitCommand}">
-                            <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                            <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                 <local:SvgIcon Icon="hsplit" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_CreateVerticalPanel_Caption}" Command="{Binding VerticalSplitCommand}">
-                            <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                            <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                 <local:SvgIcon Icon="vsplit" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
                         <Button MinWidth="{Binding ActualHeight, RelativeSource={RelativeSource Self}}" VerticalAlignment="Stretch" VerticalContentAlignment="Center" Style="{StaticResource ActionButtonStyle}" ToolTip="{x:Static res:Strings.Keybinding_PullWindowUp_Caption}" Command="{Binding PullUpCommand}">
-                            <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                            <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                 <local:SvgIcon Icon="pull-up" Color="{theme:CssResource panel-bar-button/color}" />
                             </Viewbox>
                         </Button>
@@ -179,7 +179,7 @@
                         </ContentPresenter.Style>
                     </ContentPresenter>
                 </Border>
-                <local:TabBar ItemsSource="{Binding Path=ChildNodes}" TabMinWidth="75" TabMaxWidth="200" />
+                <local:TabBar ItemsSource="{Binding Path=ChildNodes}" />
             </DockPanel>
         </Border>
     </Border>

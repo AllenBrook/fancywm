@@ -9,11 +9,11 @@
              mc:Ignorable="d"
              d:DataContext="{x:Type viewmodels:TilingNodeViewModel}"
              d:DesignHeight="450" d:DesignWidth="800">
-    <Border VerticalAlignment="Center">
-        <ContentControl Content="{Binding}">
+    <Border VerticalAlignment="Center" HorizontalAlignment="Stretch">
+        <ContentControl Content="{Binding}" HorizontalAlignment="Stretch">
             <ContentControl.Resources>
                 <DataTemplate DataType="{x:Type viewmodels:TilingPanelViewModel}">
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
                         <ContentControl>
                             <ContentControl.Style>
                                 <Style TargetType="ContentControl">
@@ -26,7 +26,7 @@
                                             <MultiDataTrigger.Setters>
                                                 <Setter Property="Content">
                                                     <Setter.Value>
-                                                        <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                                                        <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                                             <local:SvgIcon Icon="hsplit" Color="{Binding Foreground, RelativeSource={RelativeSource Self}}" />
                                                         </Viewbox>
                                                     </Setter.Value>
@@ -41,7 +41,7 @@
                                             <MultiDataTrigger.Setters>
                                                 <Setter Property="Content">
                                                     <Setter.Value>
-                                                        <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                                                        <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                                             <local:SvgIcon Icon="vsplit" Color="{Binding Foreground, RelativeSource={RelativeSource Self}}" />
                                                         </Viewbox>
                                                     </Setter.Value>
@@ -51,7 +51,7 @@
                                         <DataTrigger Binding="{Binding Path=Node.Type}" Value="{x:Static tiling:TilingNodeType.Stack}">
                                             <Setter Property="Content">
                                                 <Setter.Value>
-                                                    <Viewbox Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Uniform">
+                                                    <Viewbox Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Uniform">
                                                         <local:SvgIcon Icon="stack" Color="{Binding Foreground, RelativeSource={RelativeSource Self}}" />
                                                     </Viewbox>
                                                 </Setter.Value>
@@ -61,8 +61,8 @@
                                 </Style>
                             </ContentControl.Style>
                         </ContentControl>
-                        <Border VerticalAlignment="Center">
-                            <TextBlock Visibility="{Binding ExtraTextVisibility, RelativeSource={RelativeSource AncestorType=local:TilingNodeCaptionBlock}}" Margin="5,0,0,0" FontSize="{DynamicResource OverlayFontSize}">
+                        <Border VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                            <TextBlock Visibility="{Binding ExtraTextVisibility, RelativeSource={RelativeSource AncestorType=local:TilingNodeCaptionBlock}}" Margin="5,0,0,0" FontSize="{Binding Path=Overlay.FontSize}">
                                 <Run>
                                     <Run.Style>
                                         <Style TargetType="Run">
@@ -113,7 +113,7 @@
                     </StackPanel>
                 </DataTemplate>
                 <DataTemplate DataType="{x:Type viewmodels:TilingWindowViewModel}">
-                    <TextBlock FontSize="{DynamicResource OverlayFontSize}" MaxWidth="{DynamicResource CalculatedMaxWidth}" TextTrimming="CharacterEllipsis" Text="{Binding Path=Title, Mode=OneWay}" />
+                    <TextBlock HorizontalAlignment="Stretch" FontSize="{Binding Path=Overlay.FontSize}" TextTrimming="CharacterEllipsis" Text="{Binding Path=Title, Mode=OneWay}" />
                 </DataTemplate>
             </ContentControl.Resources>
         </ContentControl>

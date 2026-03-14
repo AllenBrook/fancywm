@@ -11,6 +11,9 @@ namespace FancyWM.ViewModels
         private bool m_isHeaderObscured;
         private bool m_isMoving;
         private bool m_childHasDirectFocus;
+        private double m_tabWidth;
+
+        public double TabWidth { get => m_tabWidth; set => SetField(ref m_tabWidth, value); }
 
         public ObservableCollection<TilingNodeViewModel> ChildNodes { get => m_childNodes; set => SetField(ref m_childNodes, value); }
 

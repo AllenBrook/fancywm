@@ -12,6 +12,15 @@ namespace FancyWM.ViewModels
         private ObservableCollection<TilingWindowViewModel> m_windowElements = [];
         private Rectangle m_focusRectangle;
         private Rectangle m_previewRectangle;
+        private double m_displayScaling;
+        private double m_fontSize;
+        private double m_iconSize;
+        private double m_tabWidth;
+
+        public double DisplayScaling { get => m_displayScaling; set => SetField(ref m_displayScaling, value); }
+        public double FontSize { get => m_fontSize; set => SetField(ref m_fontSize, value); }
+        public double IconSize { get => m_iconSize; set => SetField(ref m_iconSize, value); }
+        public double TabWidth { get => m_tabWidth; set => SetField(ref m_tabWidth, value); }
 
         public Visibility OverlayVisibility { get => m_overlayVisibility; set => SetField(ref m_overlayVisibility, value); }
 

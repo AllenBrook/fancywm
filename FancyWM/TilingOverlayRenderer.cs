@@ -11,6 +11,7 @@ using WinMan;
 using FancyWM.Windows;
 using System.Reactive.Linq;
 using System.Reactive.Disposables;
+using System.Threading;
 
 namespace FancyWM
 {
@@ -98,7 +99,7 @@ namespace FancyWM
         private readonly TilingOverlayViewModel m_viewModel = new();
         private double m_panelHeight = 22.0;
         private double m_windowPadding = 4.0;
-
+        private int m_panelFontSize = 12;
         private IReadOnlyCollection<TilingNode> m_previousSnapshot = [];
         private readonly Dictionary<TilingNode, TilingNodeViewModel> m_nodeViewModels = [];
         private IReadOnlySet<IWindow> m_previewWindows = new HashSet<IWindow>();
@@ -118,12 +119,20 @@ namespace FancyWM
             m_panelItemSecondaryActionCommand = new DelegateCommand<TilingNodeViewModel>(OnOverlayPanelItemSecondaryAction);
             m_panelItemCloseActionCommand = new DelegateCommand<TilingNodeViewModel>(OnOverlayPanelItemCloseAction);
             m_display = display;
+            m_display.ScalingChanged += OnDisplayScalingChanged;
             m_disposables.Add(App.Current.AppState.Settings
                 .Subscribe(settings =>
                 {
                     m_panelHeight = settings.PanelHeight;
                     m_windowPadding = settings.WindowPadding;
+                    m_panelFontSize = settings.PanelFontSize;
+                    UpdateResources();
                 }));
+        }
+
+        private void OnDisplayScalingChanged(object? sender, DisplayScalingChangedEventArgs e)
+        {
+            UpdateResources();
         }
 
         public void UpdateOverlay(IReadOnlyCollection<TilingNode> snapshot, IReadOnlyCollection<TilingNode> focusedPath)
@@ -149,6 +158,20 @@ namespace FancyWM
                     ViewModel = m_viewModel
                 };
             }
+        }
+
+        private void UpdateResources()
+        {
+            if (m_overlay.Dispatcher.Thread != Thread.CurrentThread)
+            {
+                m_overlay.Dispatcher.BeginInvoke(() => UpdateResources());
+                return;
+            }
+
+            m_viewModel.DisplayScaling = m_display.Scaling;
+            m_viewModel.FontSize = m_display.Scaling * m_panelFontSize;
+            m_viewModel.IconSize = m_display.Scaling * m_panelFontSize;
+            m_viewModel.TabWidth = 175 * m_display.Scaling * m_panelFontSize / 12;
         }
 
         private Rectangle AdjustForDisplay(Rectangle rectangle)
@@ -346,6 +369,7 @@ namespace FancyWM
 
         private void UpdateViewModel(TilingWindowViewModel vm, WindowNode node, IEnumerable<TilingNode> focusedPath)
         {
+            vm.Overlay = m_viewModel;
             vm.Node = node;
             vm.Title = node.WindowReference.Title;
             vm.HasFocus = focusedPath.Contains(node);
@@ -359,6 +383,7 @@ namespace FancyWM
 
         private void UpdateViewModel(TilingPanelViewModel vm, PanelNode node, IEnumerable<TilingNode> focusedPath)
         {
+            vm.Overlay = m_viewModel;
             vm.Node = node;
             vm.HasFocus = focusedPath.Contains(node);
             vm.ChildHasDirectFocus = vm.ChildNodes.Select(x => x.Node).Contains(focusedPath.FirstOrDefault());
@@ -500,6 +525,7 @@ namespace FancyWM
             }
             m_overlay.Close();
             m_viewModel.Dispose();
+            m_display.ScalingChanged -= OnDisplayScalingChanged;
             m_disposables.Dispose();
             InvalidateView();
 

@@ -58,10 +58,10 @@
                 Command="{Binding CloseCommand}"
                 CommandParameter="{Binding}" />
         </Grid.InputBindings>
-        <Button HorizontalContentAlignment="Left" Style="{StaticResource TabButton}" BorderThickness="0" Padding="0" Margin="3,0,0,0">
+        <Button HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Left" Style="{StaticResource TabButton}" BorderThickness="0" Padding="0" Margin="3,0,0,0">
             <Button.ToolTip>
                 <StackPanel>
-                    <local:TilingNodeCaptionBlock MaxCharacters="25" HorizontalAlignment="Left" TextBlock.FontWeight="Bold" DataContext="{Binding}" />
+                    <local:TilingNodeCaptionBlock HorizontalAlignment="Left" TextBlock.FontWeight="Bold" DataContext="{Binding}" />
                     <TextBlock>
                         • <Run Text="{x:Static res:Strings.Overlay_Window_SingleClickToFocus}" />
                         <LineBreak />
@@ -79,7 +79,7 @@
                     Command="{Binding SecondaryActionCommand}"
                     CommandParameter="{Binding}" />
             </Button.InputBindings>
-            <Grid HorizontalAlignment="Stretch" MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Button}}">
+            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -90,7 +90,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Margin="0,0,5,0" Height="{DynamicResource OverlayFontSize}" Width="3" CornerRadius="2">
+                <Border Grid.Column="0" Margin="0,0,5,0" Height="{Binding Path=Overlay.IconSize}" Width="3" CornerRadius="2">
                     <Border.Style>
                         <Style TargetType="{x:Type Border}">
                             <Style.Triggers>
@@ -102,10 +102,10 @@
                     </Border.Style>
                 </Border>
 
-                <Image Grid.Column="1" Width="{DynamicResource OverlayFontSize}" Height="{DynamicResource OverlayFontSize}" Stretch="Fill" Margin="0,1,5,1" Source="{Binding Icon}" Visibility="{Binding IconVisibility}" />
-                <local:TilingNodeCaptionBlock Grid.Column="2" MaxCharacters="12" FontSize="{DynamicResource OverlayFontSize}" DataContext="{Binding}" />
+                <Image Grid.Column="1" Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}" Stretch="Fill" Margin="0,1,5,1" Source="{Binding Icon}" Visibility="{Binding IconVisibility}" />
+                <local:TilingNodeCaptionBlock Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" DataContext="{Binding}" />
 
-                <Button Grid.Column="3" ToolTip="{x:Static res:Strings.Close}" Background="Transparent" Padding="0" Margin="0,0,2,0" Width="14" Height="14">
+                <Button Grid.Column="3" ToolTip="{x:Static res:Strings.Close}" Background="Transparent" Padding="2" Margin="0,0,2,0" Width="{Binding Path=Overlay.IconSize}" Height="{Binding Path=Overlay.IconSize}">
                     <Button.InputBindings>
                         <MouseBinding
                             MouseAction="LeftClick"

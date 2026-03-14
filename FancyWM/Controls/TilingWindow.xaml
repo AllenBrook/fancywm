@@ -33,7 +33,7 @@
     </UserControl.ContextMenu>
     <Grid>
         <Border
-            TextBlock.FontSize="15"
+            TextBlock.FontSize="{Binding Path=Overlay.FontSize}"
             TextBlock.Foreground="White"
             TextBlock.FontWeight="SemiBold"
             Height="{Binding Path=ActionsHeight}"
@@ -48,7 +48,7 @@
             VerticalAlignment="Top"
             HorizontalAlignment="Center">
             <Border.RenderTransform>
-                <ScaleTransform ScaleX="{DynamicResource DisplayScaling}" ScaleY="{DynamicResource DisplayScaling}" />
+                <ScaleTransform ScaleX="{Binding Path=Overlay.DisplayScaling}" ScaleY="{Binding Path=Overlay.DisplayScaling}" />
             </Border.RenderTransform>
             <Border.OpacityMask>
                 <VisualBrush>
