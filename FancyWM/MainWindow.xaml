@@ -7,13 +7,9 @@
         Title="FancyWMMainWindow"
         xmlns:res="clr-namespace:FancyWM.Resources"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Topmost="True"
         Focusable="True"
         ShowInTaskbar="False"
-        Width="0"
-        Height="0"
-        Background="{x:Null}">
+        WindowState="Minimized">
     <Window.Resources>
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick" />

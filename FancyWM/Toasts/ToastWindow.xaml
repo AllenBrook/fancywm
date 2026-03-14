@@ -32,7 +32,7 @@
                         <EventTrigger RoutedEvent="FrameworkElement.Loaded">
                             <BeginStoryboard>
                                 <Storyboard>
-                                    <DoubleAnimation 
+                                    <DoubleAnimation
                                         Storyboard.TargetProperty="Opacity"
                                         Duration="0:0:0.1"
                                         To="1" />

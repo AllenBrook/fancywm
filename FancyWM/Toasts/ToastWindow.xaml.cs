@@ -8,6 +8,7 @@ using FancyWM.DllImports;
 
 using WinMan;
 using System.Windows.Interop;
+using System.Threading.Tasks;
 
 namespace FancyWM.Toasts
 {
@@ -75,20 +76,32 @@ namespace FancyWM.Toasts
 
         internal void ShowToast(object content, CancellationToken token)
         {
-            var item = new ToastItem(content);
-            ToastItems.Clear();
-            ToastItems.Add(item);
-            PInvoke.SetWindowPos(new(new WindowInteropHelper(this).EnsureHandle()), new(-1), 0, 0, 0, 0, SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOSENDCHANGING);
-            token.Register(() => Dispatcher.Invoke(() => ToastItems.Remove(item)));
+            ShowToast(content, null, token);
         }
 
-        internal void ShowToast(object content, Action extraAction, CancellationToken token)
+        internal void ShowToast(object content, Action? extraAction, CancellationToken token)
         {
             var item = new ToastItem(content, extraAction);
             ToastItems.Clear();
             ToastItems.Add(item);
-            PInvoke.SetWindowPos(new(new WindowInteropHelper(this).EnsureHandle()), new(-1), 0, 0, 0, 0, SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOSENDCHANGING);
-            token.Register(() => Dispatcher.Invoke(() => ToastItems.Remove(item)));
+            UpdateVisibility(true);
+            token.Register(() => Dispatcher.Invoke(() => RemoveItem(item)));
+        }
+
+        private void RemoveItem(ToastItem item)
+        {
+            ToastItems.Remove(item);
+            if (ToastItems.Count == 0)
+            {
+                UpdateVisibility(false);
+            }
+        }
+
+        private void UpdateVisibility(bool show)
+        {
+            var flags = SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOSENDCHANGING;
+            flags |= show ? SetWindowPos_uFlags.SWP_SHOWWINDOW : SetWindowPos_uFlags.SWP_HIDEWINDOW;
+            PInvoke.SetWindowPos(new(new WindowInteropHelper(this).EnsureHandle()), new(-1), 0, 0, 0, 0, flags);
         }
     }
 }

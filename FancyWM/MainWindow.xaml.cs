@@ -256,7 +256,7 @@ namespace FancyWM
 
             Loaded += OnLoaded;
             Show();
-
+            Hide();
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
 
             ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
