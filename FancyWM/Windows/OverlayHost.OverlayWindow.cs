@@ -35,6 +35,7 @@ namespace FancyWM.Windows
                 ShowInTaskbar = false;
                 AllowsTransparency = true;
                 Background = null;
+                SnapsToDevicePixels = true;
 
                 m_hwnd = new WindowInteropHelper(this).EnsureHandle();
                 m_contentContainer = new Border();
