@@ -83,7 +83,7 @@ namespace FancyWM.Controls
             {
                 if (!panelVn.ChildHasDirectFocus)
                 {
-                    if (panelVn.ChildNodes.First().Node?.Windows.FirstOrDefault() is WindowNode windowNode)
+                    if (panelVn.ChildNodes.FirstOrDefault()?.Node?.Windows.FirstOrDefault() is WindowNode windowNode)
                     {
                         FocusHelper.ForceActivate(windowNode.WindowReference.Handle);
                     }

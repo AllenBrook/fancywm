@@ -1,4 +1,4 @@
-构建同步目录由 last release 改为 latest
+修复 TilingPanel 点击空面板时崩溃
 
-- AutoBuild_SyncLastRelease.bat 输出到 Release\*\latest
-- AutoBuild_Framework / SelfContained / AndRun 脚本路径与提示同步更新
+- OnPanelMouseDown 中 ChildNodes.First() 在子节点为空时抛 InvalidOperationException
+- 改为 FirstOrDefault()，无子节点或无窗口时跳过激活
