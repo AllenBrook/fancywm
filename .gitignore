@@ -366,3 +366,4 @@ FodyWeavers.xsd
 
 # FancyWM packaging project
 PackageProject/
+.github/pending_commit_notes.txt

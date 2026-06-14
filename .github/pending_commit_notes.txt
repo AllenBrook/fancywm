@@ -1,5 +1,5 @@
-修复 monorepo 转换后 Nerdbank.GitVersioning 导致编译失败
+构建后同步输出到 last release 目录
 
-- Directory.Build.props 设置 GitVersionBaseDirectory 为仓库根目录
-- 避免 NBGV 遍历历史时解析 winman/winman-windows 等旧子模块 gitlink（对象不在主仓）
-- AutoBuildAndRun.bat 已验证可成功编译并启动 FancyWM-GUI.exe
+- 新增 AutoBuild_SyncLastRelease.bat：将本次时间戳目录内容镜像到 Release\*\last release
+- AutoBuild_Framework.bat / AutoBuild_SelfContained.bat 构建成功后自动调用同步
+- AutoBuildAndRun.bat 改为从 Release\Framework\last release 启动程序

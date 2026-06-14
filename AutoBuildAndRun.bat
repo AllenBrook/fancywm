@@ -16,22 +16,8 @@ if errorlevel 1 (
 )
 
 set "RELEASE_ROOT=%~dp0Release\Framework"
-set "OUTPUT_DIR="
+set "OUTPUT_DIR=%RELEASE_ROOT%\last release"
 
-if not exist "%RELEASE_ROOT%" (
-    echo Build output folder not found: %RELEASE_ROOT%
-    exit /b 1
-)
-
-for /f "delims=" %%D in ('dir /b /ad /o-d "%RELEASE_ROOT%" 2^>nul') do (
-    set "OUTPUT_DIR=%RELEASE_ROOT%\%%D"
-    goto :found
-)
-
-echo No build output found under %RELEASE_ROOT%
-exit /b 1
-
-:found
 if not exist "%OUTPUT_DIR%\FancyWM-GUI.exe" (
     echo Executable not found: %OUTPUT_DIR%\FancyWM-GUI.exe
     exit /b 1
