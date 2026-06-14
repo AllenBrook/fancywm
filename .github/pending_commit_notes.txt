@@ -1,4 +1,0 @@
-修复 TilingPanel 点击空面板时崩溃
-
-- OnPanelMouseDown 中 ChildNodes.First() 在子节点为空时抛 InvalidOperationException
-- 改为 FirstOrDefault()，无子节点或无窗口时跳过激活
