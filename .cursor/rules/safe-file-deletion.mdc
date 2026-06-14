@@ -1,0 +1,56 @@
+---
+description: 禁止永久删除；删除文件/目录必须进回收站，并严格限定路径
+alwaysApply: true
+---
+
+# 安全删除（强约束）
+
+## 禁止
+
+- **永久删除**命令，包括但不限于：
+  - `rd /s /q`、`del /f /s`、`rmdir /s /q`
+  - `Remove-Item -Recurse -Force`（且未进回收站）
+  - `rm -rf`、`os.remove` / `shutil.rmtree`（不可恢复）
+  - `git clean -fdx`、`git reset --hard`（除非用户**明确**要求且理解后果）
+- 对**用户未点名**的路径做删除；禁止用通配或父目录“顺带清理”。
+- 用 `cmd /c rd ...` 删目录（引号在 Windows 下极易误删）。
+
+## 必须
+
+1. **仅当用户明确要求删除**，且路径已逐字确认（含盘符、完整相对/绝对路径）。
+2. **删除 = 进回收站**，不得跳过回收站直接抹掉。
+3. 删除前用 `Test-Path` / `ls` 确认目标存在；删后说明**删了什么、原路径是什么**。
+4. 能改代码/配置解决的，**不要**删磁盘文件（例如迁移后删旧目录应让用户确认）。
+
+## Windows（PowerShell 5.1）推荐写法
+
+单文件进回收站：
+
+```powershell
+Add-Type -AssemblyName Microsoft.VisualBasic
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+    'D:\path\to\file.txt',
+    'OnlyErrorDialogs',
+    'SendToRecycleBin')
+```
+
+目录进回收站：
+
+```powershell
+Add-Type -AssemblyName Microsoft.VisualBasic
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+    'D:\path\to\folder',
+    'OnlyErrorDialogs',
+    'SendToRecycleBin')
+```
+
+若 `Microsoft.VisualBasic` 不可用：**不要**改用 `Remove-Item -Force`；改为请用户手动删，或说明无法安全进回收站。
+
+## 批量 / 清理脚本
+
+- 脚本里同样禁止 `rd /s /q`、`Remove-Item -Recurse -Force` 永久删。
+- 清理 `bin/`、`obj/` 等构建产物前，路径必须写死在仓库内，且优先让用户跑现有 `.bat` / 构建脚本。
+
+## 违反时
+
+若误用永久删除或路径不确定：**立即停止**，告知用户影响范围与回收站/备份恢复步骤，**不要**继续删或“再试一条命令”。

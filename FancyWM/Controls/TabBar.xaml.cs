@@ -122,7 +122,7 @@ namespace FancyWM.Controls
                 && panelViewModel.Node is StackPanelNode stack
                 && m_dragSourceIndex >= 0)
             {
-                var insertBeforeIndex = GetInsertIndex(e.GetPosition(this));
+                var insertBeforeIndex = GetInsertIndex(e.GetPosition(this), m_dragSourceTab, panelViewModel);
                 var targetIndex = insertBeforeIndex;
                 if (m_dragSourceIndex < targetIndex)
                 {
@@ -178,12 +178,12 @@ namespace FancyWM.Controls
             return panelViewModel.ChildNodes.IndexOf(tabViewModel);
         }
 
-        private int GetInsertIndex(Point position)
+        private int GetInsertIndex(Point position, TilingNodeTab? excludeTab, TilingPanelViewModel panelViewModel)
         {
-            var tabs = GetVisibleTabs();
+            var tabs = GetVisibleTabs(excludeTab);
             if (tabs.Count == 0)
             {
-                return 0;
+                return panelViewModel.ChildNodes.Count;
             }
 
             for (var i = 0; i < tabs.Count; i++)
@@ -192,33 +192,33 @@ namespace FancyWM.Controls
                 var midX = topLeft.X + tabs[i].ActualWidth / 2;
                 if (position.X < midX)
                 {
-                    return i;
+                    return GetTabIndex(tabs[i], panelViewModel);
                 }
             }
 
-            return tabs.Count;
+            return panelViewModel.ChildNodes.Count;
         }
 
-        private System.Collections.Generic.List<TilingNodeTab> GetVisibleTabs()
+        private System.Collections.Generic.List<TilingNodeTab> GetVisibleTabs(TilingNodeTab? excludeTab = null)
         {
             var tabs = new System.Collections.Generic.List<TilingNodeTab>();
-            CollectTabs(TabsItemsControl, tabs);
+            CollectTabs(TabsItemsControl, tabs, excludeTab);
             return tabs;
         }
 
-        private static void CollectTabs(DependencyObject parent, System.Collections.Generic.List<TilingNodeTab> tabs)
+        private static void CollectTabs(DependencyObject parent, System.Collections.Generic.List<TilingNodeTab> tabs, TilingNodeTab? excludeTab)
         {
             var count = VisualTreeHelper.GetChildrenCount(parent);
             for (var i = 0; i < count; i++)
             {
                 var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is TilingNodeTab tab)
+                if (child is TilingNodeTab tab && tab != excludeTab)
                 {
                     tabs.Add(tab);
                 }
                 else
                 {
-                    CollectTabs(child, tabs);
+                    CollectTabs(child, tabs, excludeTab);
                 }
             }
         }

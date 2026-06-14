@@ -154,10 +154,10 @@ In case of crashes, please also remember to save and attach the log file produce
 
 ## Building from source
 
-Clone this repo, including submodules.
+Clone this repo (ModernWpf, winman, and winman-windows are included in the tree).
 
 ```bash
-git clone --recursive https://github.com/FancyWM/fancywm.git
+git clone https://github.com/FancyWM/fancywm.git
 ```
 
 Open the .sln file with Visual Studio 2022 and build the FancyWM project.

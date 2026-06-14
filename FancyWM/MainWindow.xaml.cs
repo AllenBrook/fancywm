@@ -242,12 +242,6 @@ namespace FancyWM
             };
             setPanelStackMenuItem.Click += OnSetPanelStackClick;
             m_contextMenu.Items.Insert(1, setPanelStackMenuItem);
-            var resetLayoutMenuItem = new MenuItem
-            {
-                Header = Strings.ResourceManager.GetString("Advanced.ResetLayout.Caption", Strings.Culture) ?? "Reset window layout",
-            };
-            resetLayoutMenuItem.Click += OnResetLayoutClick;
-            m_contextMenu.Items.Insert(2, resetLayoutMenuItem);
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -1668,22 +1662,6 @@ namespace FancyWM
             m_logger.Debug("Application restart requested!");
             m_contextMenu.IsOpen = false;
             App.Current.RequestRestart();
-        }
-
-        private void OnResetLayoutClick(object? sender, RoutedEventArgs e)
-        {
-            m_contextMenu.IsOpen = false;
-            if (new Windows.MessageBox
-            {
-                IconGlyph = "\xE72C",
-                Title = Strings.ResourceManager.GetString("Advanced.ResetLayout.Caption", Strings.Culture) ?? "Reset window layout",
-                Message = Strings.ResourceManager.GetString("Advanced.ResetLayout.Confirm", Strings.Culture),
-            }.ShowDialog() != true)
-            {
-                return;
-            }
-
-            ResetWindowLayout();
         }
 
         private void OnExitClick(object? sender, RoutedEventArgs e)

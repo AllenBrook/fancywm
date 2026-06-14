@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+
+    <CetCompat>false</CetCompat>
+
+    <Nullable>enable</Nullable>
+
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+
+    <Authors>FancyWM,veselink1</Authors>
+
+    <Description>A platform-agnostic event-based window management library for .NET (Windows/Win32 implementation)</Description>
+
+    <PackageProjectUrl>https://github.com/FancyWM/winman-windows</PackageProjectUrl>
+
+    <PackageIcon>Icon.png</PackageIcon>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <RepositoryUrl>https://github.com/FancyWM/winman-windows</RepositoryUrl>
+
+    <RepositoryType>git</RepositoryType>
+
+    <PackageTags>win32 windows shell window manager</PackageTags>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+
+    <Version>1.0.1</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\Resources\Icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\WinMan\src\WinMan\WinMan.csproj" />
+    <ProjectReference Include="..\WinMan.Windows.DllImports\WinMan.Windows.DllImports.csproj">
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+      <IncludeAssets>{ProjectName}.dll</IncludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

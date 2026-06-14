@@ -1,0 +1,25 @@
+---
+description: 任务收尾必须写 pending_commit_notes；禁止 Agent 自动 commit/push
+alwaysApply: true
+---
+
+# 本地待提交备注（pending_commit_notes）
+
+本仓库使用根目录 **`自动提交.bat`** / **`自动提交同步.bat`**：提交时用 **`git commit -F`** 读取备注文件全文（`--cleanup=verbatim`），提交成功后会**清空**该备注文件；`自动提交同步.bat` 在提交后继续 **`git push`** 当前分支。
+
+## 你必须遵守
+
+### A. 写入提交备注（强制）
+
+1. **在完成一批实质性改动**（功能、修复、重构、依赖、测试或构建脚本等有意义的收尾）后，**必须**把简要修正说明写入 **`.github/pending_commit_notes.txt`**，供用户稍后手动运行 `自动提交.bat` 使用。
+2. **写备注 ≠ 提交**：生成/更新备注文件是 Agent 的收尾义务；**不得**因此自动执行 `git commit`、`git push` 或 bat 脚本（见 B 节）。
+3. **优先使用该 `.txt` 路径**（与脚本一致）。若同时存在 `.github/pending_commit_notes.md`，脚本会优先用 `.md`；若希望固定走 `.txt`，请不要保留占位的 `.md`，或确保 `.txt` 非空（脚本会对 `.md` 为空时回退到 `.txt`）。
+4. 若 **`pending_commit_notes.txt` 尚不存在**，先在 `.github/` 下创建再写入。
+5. 内容格式需适合 **整文件作为一条 commit message**：首行可作短标题（约 50 字内），空一行后写条目化说明（改了什么、为什么）。避免仅写无意义的词；**勿**依赖 Markdown 渲染（提交记录里是纯文本）。
+6. 写入后在回复中简要说明备注路径与摘要；**不要**声称已提交或已推送。
+7. **问答/纯说明、无仓库改动**的任务：不必写该文件。
+
+### B. 禁止 Agent 自动提交/推送（强制）
+
+8. **不要**在任务收尾时自动执行 `git commit`、`git push`、`git add`、`自动提交.bat` 或 `自动提交同步.bat`，除非用户**在本轮对话中明确要求**提交或推送。
+9. 默认工作流：**Agent 写 `.github/pending_commit_notes.txt`** → **用户自行 PR / 审阅** → 在仓库根目录**手动**运行 `自动提交.bat`（仅 commit）或 `自动提交同步.bat`（commit + push）。
