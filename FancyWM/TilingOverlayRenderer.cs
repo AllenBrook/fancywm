@@ -224,6 +224,8 @@ namespace FancyWM
                 }
             }
 
+            PruneUnreachableViewModels(snapshot);
+
             foreach (var stackNode in snapshot.OfType<StackPanelNode>())
             {
                 if (GetViewModel(stackNode) is TilingPanelViewModel stackViewModel)
@@ -234,40 +236,11 @@ namespace FancyWM
                         .Contains(focusedPath.FirstOrDefault());
                 }
             }
-
-            PruneUnreachableViewModels(snapshot);
-        }
-
-        private static HashSet<TilingNode> CollectReachableNodes(IReadOnlyCollection<TilingNode> snapshot)
-        {
-            var reachable = new HashSet<TilingNode>();
-            void Visit(TilingNode node)
-            {
-                if (!reachable.Add(node))
-                {
-                    return;
-                }
-
-                if (node is PanelNode panel)
-                {
-                    foreach (var child in panel.Children)
-                    {
-                        Visit(child);
-                    }
-                }
-            }
-
-            foreach (var node in snapshot)
-            {
-                Visit(node);
-            }
-
-            return reachable;
         }
 
         private void PruneUnreachableViewModels(IReadOnlyCollection<TilingNode> snapshot)
         {
-            var reachable = CollectReachableNodes(snapshot);
+            var reachable = snapshot.ToHashSet();
             foreach (var removedNode in m_nodeViewModels.Keys.Where(node => !reachable.Contains(node)).ToList())
             {
                 DisposeViewModel(removedNode);

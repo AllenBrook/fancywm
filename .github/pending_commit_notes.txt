@@ -1,0 +1,5 @@
+修复再次 Stack 后标签栏全部消失
+
+- TilingOverlayRenderer：PruneUnreachableViewModels 改在 stack 的 SyncChildNodes 之前执行
+- 清理不可达 VM 后重新同步 StackPanel 的 ChildNodes，避免 tab 被误删后不再恢复
+- reachable 集合改为 snapshot.ToHashSet()，与布局快照一致
