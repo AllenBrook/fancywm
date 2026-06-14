@@ -42,6 +42,13 @@ namespace FancyWM
             public Rectangle ComputedRectangle = node.ComputedRectangle;
         }
 
+        private sealed class ShowDesktopLayoutSnapshot
+        {
+            public required PanelNode RootClone { get; init; }
+            public required Dictionary<IntPtr, Rectangle> WindowRects { get; init; }
+            public IntPtr? FocusedWindowHandle { get; init; }
+        }
+
         public event EventHandler<TilingFailedEventArgs>? PlacementFailed;
         public event EventHandler<EventArgs>? PendingIntentChanged;
 
@@ -59,12 +66,13 @@ namespace FancyWM
 
         private bool m_allocateNewPanelSpace;
 
+        private bool m_stackAppendRestoredTabsToEnd = true;
+
         private bool m_animateWindowMovement;
 
         private int m_autoSplitCount = 100;
 
         private bool m_delayReposition = false;
-        private bool m_autoFloatNewWindows = false;
 
         private void SetAutoCollapse(bool value)
         {
@@ -101,20 +109,24 @@ namespace FancyWM
 
         public IWorkspace Workspace => m_workspace;
 
-        public IReadOnlyCollection<IWindowMatcher> ExclusionMatchers
+        public IReadOnlyCollection<IWindowMatcher> InclusionMatchers
         {
-            get => m_exclusionMatchers;
+            get => m_inclusionMatchers;
             set
             {
-                m_exclusionMatchers = [.. value];
+                m_inclusionMatchers = [.. value];
 
                 using (m_windowSetLock.EnterScope())
                 {
                     foreach (var window in m_windowSet)
                     {
-                        if (m_exclusionMatchers.Any(x => x.Matches(window)))
+                        using (m_floatingSetLock.EnterScope())
                         {
-                            using (m_floatingSetLock.EnterScope())
+                            if (ShouldAutoTile(window))
+                            {
+                                m_floatingSet.Remove(window);
+                            }
+                            else
                             {
                                 m_floatingSet.Add(window);
                             }
@@ -147,7 +159,7 @@ namespace FancyWM
         private readonly Dispatcher m_dispatcher;
         private readonly IWorkspace m_workspace;
         private readonly ILogger m_logger = App.Current.Logger;
-        private IReadOnlyCollection<IWindowMatcher> m_exclusionMatchers = [];
+        private IReadOnlyCollection<IWindowMatcher> m_inclusionMatchers = [];
 
         private readonly TilingOverlayRenderer m_gui;
         private readonly IDisplay m_display;
@@ -164,11 +176,18 @@ namespace FancyWM
         private readonly HashSet<IWindow> m_floatingSet = [];
         private readonly Utilities.DebugLock m_floatingSetLock = new(LockThreshold);
 
+        private readonly HashSet<int> m_autoTileProcessIds = [];
+        private readonly Utilities.DebugLock m_autoTileProcessIdsLock = new(LockThreshold);
+
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
         private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
 
         private readonly Dictionary<IWindow, NodeLocation> m_savedLocations = [];
         private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
+
+        private ShowDesktopLayoutSnapshot? m_showDesktopSnapshot;
+        private bool m_showDesktopAwaitingRestore;
+        private int m_showDesktopRestoreGeneration;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
@@ -259,10 +278,10 @@ namespace FancyWM
             _ = m_dispatcher.RunAsync(() =>
             {
                 m_allocateNewPanelSpace = x.AllocateNewPanelSpace;
+                m_stackAppendRestoredTabsToEnd = x.StackAppendRestoredTabsToEnd;
                 m_animateWindowMovement = x.AnimateWindowMovement;
                 m_autoSplitCount = x.AutoSplitCount;
                 m_delayReposition = x.DelayReposition;
-                m_autoFloatNewWindows = x.AutoFloatNewWindows;
                 SetWindowPadding(x.WindowPadding);
                 SetPanelHeight(x.PanelHeight);
                 SetShowFocus(x.ShowFocus);
@@ -284,6 +303,18 @@ namespace FancyWM
             m_gui.Hide();
         }
 
+        public void ResetLayout()
+        {
+            if (m_dispatcher.CheckAccess())
+            {
+                ResetLayoutCore();
+            }
+            else
+            {
+                m_dispatcher.Invoke(ResetLayoutCore);
+            }
+        }
+
         public bool CanMoveFocus(TilingDirection direction)
         {
             return HasFocusAndAdjacentWindow(direction);
@@ -291,9 +322,13 @@ namespace FancyWM
 
         public void MoveFocus(TilingDirection direction)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true)
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var adjacentWindow = m_backend.GetFocusAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
+                var adjacentWindow = focusedNode.GetAdjacentWindow(direction)
+                    ?? throw new TilingFailedException(TilingError.MissingAdjacentWindow);
                 if (FocusHelper.ForceActivate(adjacentWindow.WindowReference.Handle))
                 {
                     m_backend.SetFocus(adjacentWindow);
@@ -310,9 +345,11 @@ namespace FancyWM
 
         public void MoveWindow(TilingDirection direction)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true)
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 WindowNode? adjacentWindow = focusedNode.GetAdjacentWindow(direction) ?? throw new TilingFailedException(TilingError.MissingAdjacentWindow);
                 var adjancentWindowIndex = adjacentWindow.Parent!.IndexOf(adjacentWindow);
 
@@ -346,10 +383,14 @@ namespace FancyWM
 
         public void SwapFocus(TilingDirection direction)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true)
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+            var adjacentWindow = focusedNode.GetAdjacentWindow(direction)
+                ?? throw new TilingFailedException(TilingError.MissingAdjacentWindow);
+
             using (m_backendLock.EnterScope())
             {
-                (var currentWindow, var adjacentWindow) = m_backend.GetFocusAndAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
-                currentWindow!.Swap(adjacentWindow);
+                focusedNode.Swap(adjacentWindow);
             }
             InvalidateLayout();
         }
@@ -455,18 +496,21 @@ namespace FancyWM
 
         public bool CanSplit(bool vertical)
         {
-            using (m_backendLock.EnterScope())
-            {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                return focusedNode != null && CanSplit(focusedNode);
-            }
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            if (focusedNode != null)
+                return CanSplit(focusedNode);
+
+            var window = m_workspace.FocusedWindow;
+            return window != null && CanManage(window, ignoreFloating: true);
         }
 
         public void Split(bool vertical)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true)
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 WrapInSplitPanel(focusedNode, vertical);
                 m_backend.SetFocus(focusedNode);
             }
@@ -493,37 +537,56 @@ namespace FancyWM
         {
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                return focusedNode != null && CanStack(focusedNode);
+                var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+                if (m_backend.IsFullyStacked(desktop))
+                    return false;
             }
+
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            if (focusedNode != null)
+                return CanStack(focusedNode);
+
+            var window = m_workspace.FocusedWindow;
+            return window != null && CanManage(window, ignoreFloating: true);
         }
 
         public void Stack()
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true);
+            if (focusedNode == null || focusedNode.Parent == null)
+                throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                if (focusedNode == null || focusedNode.Parent == null)
-                    throw new TilingFailedException(TilingError.MissingTarget);
+                ApplyStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop, focusedNode);
+            }
+        }
 
-                WrapInStackPanel(focusedNode);
+        public void SetPanelStack()
+        {
+            if (m_dispatcher.CheckAccess())
+            {
+                SetPanelStackCore();
+            }
+            else
+            {
+                m_dispatcher.Invoke(SetPanelStackCore);
             }
         }
 
         public bool CanPullUp()
         {
-            using (m_backendLock.EnterScope())
-            {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                return focusedNode != null && focusedNode.Parent != focusedNode.Desktop!.Root;
-            }
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            return focusedNode != null && focusedNode.Parent != focusedNode.Desktop!.Root;
         }
 
         public void PullUp()
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true)
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop) ?? throw new TilingFailedException(TilingError.MissingTarget);
                 MoveToParentPanel(focusedNode);
                 m_backend.SetFocus(focusedNode);
             }
@@ -599,11 +662,12 @@ namespace FancyWM
 
         public bool CanResize(PanelOrientation orientation, double displayPercentage)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            if (focusedNode is not WindowNode focusedWindow)
+                return false;
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                if (focusedNode is not WindowNode focusedWindow)
-                    return false;
 
                 var window = focusedWindow.WindowReference;
                 var oldSize = window.Position;
@@ -640,11 +704,12 @@ namespace FancyWM
 
         public void Resize(PanelOrientation orientation, double displayPercentage)
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: true);
+            if (focusedNode is not WindowNode focusedWindow)
+                throw new TilingFailedException(TilingError.MissingTarget);
+
             using (m_backendLock.EnterScope())
             {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                if (focusedNode is not WindowNode focusedWindow)
-                    throw new TilingFailedException(TilingError.MissingTarget);
 
                 var window = focusedWindow.WindowReference;
                 var oldSize = window.Position;
@@ -664,14 +729,11 @@ namespace FancyWM
 
         public IWindow? GetFocus()
         {
-            using (m_backendLock.EnterScope())
-            {
-                var focusedNode = m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                if (focusedNode is not WindowNode focusedWindow)
-                    return null;
+            var focusedNode = GetFocusedTilingNode();
+            if (focusedNode is not WindowNode focusedWindow)
+                return null;
 
-                return focusedWindow.WindowReference;
-            }
+            return focusedWindow.WindowReference;
         }
 
         public Rectangle GetBounds()

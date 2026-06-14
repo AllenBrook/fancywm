@@ -421,6 +421,24 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Language.
+        /// </summary>
+        public static string General_UiLanguage {
+            get {
+                return ResourceManager.GetString("General.UiLanguage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Restart FancyWM for changes to take effect!.
+        /// </summary>
+        public static string General_UiLanguage_Description {
+            get {
+                return ResourceManager.GetString("General.UiLanguage.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Help.
         /// </summary>
         public static string Help_Caption {
@@ -471,6 +489,24 @@ namespace FancyWM.Resources {
         public static string Interaction_AutoCollapsePanels_Description {
             get {
                 return ResourceManager.GetString("Interaction.AutoCollapsePanels.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Append restored stack tabs to the right.
+        /// </summary>
+        public static string Interaction_StackAppendRestoredTabsToEnd {
+            get {
+                return ResourceManager.GetString("Interaction.StackAppendRestoredTabsToEnd", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to When a minimized window is restored in a stack panel, place its tab at the rightmost position. When disabled, tabs return to their previous order..
+        /// </summary>
+        public static string Interaction_StackAppendRestoredTabsToEnd_Description {
+            get {
+                return ResourceManager.GetString("Interaction.StackAppendRestoredTabsToEnd.Description", resourceCulture);
             }
         }
         
@@ -2369,6 +2405,24 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Ctrl + drag to reorder tabs.
+        /// </summary>
+        public static string Overlay_Window_CtrlDragToReorderTab {
+            get {
+                return ResourceManager.GetString("Overlay.Window.CtrlDragToReorderTab", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Right-click and drag to reorder tabs.
+        /// </summary>
+        public static string Overlay_Window_RightDragToReorderTab {
+            get {
+                return ResourceManager.GetString("Overlay.Window.RightDragToReorderTab", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Single click to focus.
         /// </summary>
         public static string Overlay_Window_SingleClickToFocus {
@@ -2405,47 +2459,47 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Automatically float by window class.
+        ///   Looks up a localized string similar to Automatically tile by window class.
         /// </summary>
-        public static string Rules_ClassIgnoreList {
+        public static string Rules_ClassIncludeList {
             get {
-                return ResourceManager.GetString("Rules.ClassIgnoreList", resourceCulture);
+                return ResourceManager.GetString("Rules.ClassIncludeList", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Floating mode will be automatically enabled for windows with a matching window class. The matching is not case-sensitive and you may use regular expressions..
+        ///   Looks up a localized string similar to Windows with a matching window class will be automatically tiled. The matching is not case-sensitive and you may use regular expressions..
         /// </summary>
-        public static string Rules_ClassIgnoreList_Description {
+        public static string Rules_ClassIncludeList_Description {
             get {
-                return ResourceManager.GetString("Rules.ClassIgnoreList.Description", resourceCulture);
+                return ResourceManager.GetString("Rules.ClassIncludeList.Description", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Floating windows.
+        ///   Looks up a localized string similar to Managed windows.
         /// </summary>
-        public static string Rules_FloatingWindows {
+        public static string Rules_ManagedWindows {
             get {
-                return ResourceManager.GetString("Rules.FloatingWindows", resourceCulture);
+                return ResourceManager.GetString("Rules.ManagedWindows", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Automatically float by process name.
+        ///   Looks up a localized string similar to Automatically tile by process name.
         /// </summary>
-        public static string Rules_ProcessIgnoreList {
+        public static string Rules_ProcessIncludeList {
             get {
-                return ResourceManager.GetString("Rules.ProcessIgnoreList", resourceCulture);
+                return ResourceManager.GetString("Rules.ProcessIncludeList", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Floating mode will be automatically enabled for windows belonging to one of the processes. Enter one process name per line, excluding the &quot;.exe&quot; extension (e.g. &quot;explorer&quot;). The matching is not case-sensitive and you may use regular expressions..
+        ///   Looks up a localized string similar to Windows belonging to one of the listed processes will be automatically tiled. Enter one process name per line, excluding the &quot;.exe&quot; extension (e.g. &quot;explorer&quot;). The matching is not case-sensitive and you may use regular expressions..
         /// </summary>
-        public static string Rules_ProcessIgnoreList_Description {
+        public static string Rules_ProcessIncludeList_Description {
             get {
-                return ResourceManager.GetString("Rules.ProcessIgnoreList.Description", resourceCulture);
+                return ResourceManager.GetString("Rules.ProcessIncludeList.Description", resourceCulture);
             }
         }
         

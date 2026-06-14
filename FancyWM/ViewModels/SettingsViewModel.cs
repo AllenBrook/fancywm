@@ -37,6 +37,7 @@ namespace FancyWM.ViewModels
         public bool NotifyVirtualDesktopServiceIncompatibility { get => m_notifyVirtualDesktopServiceIncompatibility; set => SetField(ref m_notifyVirtualDesktopServiceIncompatibility, value); }
         public bool AllocateNewPanelSpace { get => m_allocateNewPanelSpace; set => SetField(ref m_allocateNewPanelSpace, value); }
         public bool AutoCollapsePanels { get => m_autoCollapsePanels; set => SetField(ref m_autoCollapsePanels, value); }
+        public bool StackAppendRestoredTabsToEnd { get => m_stackAppendRestoredTabsToEnd; set => SetField(ref m_stackAppendRestoredTabsToEnd, value); }
         public int AutoSplitCount { get => m_autoSplitCount; set => SetField(ref m_autoSplitCount, value); }
 
         public bool DelayReposition { get => m_delayReposition; set => SetField(ref m_delayReposition, value); }
@@ -186,11 +187,21 @@ namespace FancyWM.ViewModels
         [DerivedProperty(nameof(Keybindings))]
         public IList<KeybindingGroup>? KeybindingGroups => CreateKeybindingGroups(m_keybindings!);
 
-        public IList<string>? ProcessIgnoreList { get => m_processIgnoreList; set => SetField(ref m_processIgnoreList, value); }
+        public IList<string>? ProcessIncludeList { get => m_processIncludeList; set => SetField(ref m_processIncludeList, value); }
 
-        public IList<string>? ClassIgnoreList { get => m_classIgnoreList; set => SetField(ref m_classIgnoreList, value); }
+        public IList<string>? ProcessInstanceIncludeList { get => m_processInstanceIncludeList; set => SetField(ref m_processInstanceIncludeList, value); }
+
+        public IList<string>? ClassIncludeList { get => m_classIncludeList; set => SetField(ref m_classIncludeList, value); }
 
         public bool MultiMonitorSupport { get => m_multiMonitorSupport; set => SetField(ref m_multiMonitorSupport, value); }
+
+        public IReadOnlyList<UiLanguageOption> UiLanguageOptions { get; } =
+        [
+            new(LocalizationService.English, "English"),
+            new(LocalizationService.ChineseSimplified, "简体中文"),
+        ];
+
+        public string UiLanguage { get => m_uiLanguage; set => SetField(ref m_uiLanguage, LocalizationService.Normalize(value)); }
 
         public bool SoundOnFailure { get => m_soundOnFailure; set => SetField(ref m_soundOnFailure, value); }
 
@@ -200,6 +211,7 @@ namespace FancyWM.ViewModels
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private bool m_allocateNewPanelSpace;
         private bool m_autoCollapsePanels;
+        private bool m_stackAppendRestoredTabsToEnd = true;
         private int m_autoSplitCount;
         private bool m_delayReposition;
         private bool m_customAccentColor;
@@ -216,9 +228,11 @@ namespace FancyWM.ViewModels
         private int m_windowPadding;
         private ActivationHotkey? m_activationHotkey;
         private bool m_activateOnCapsLock;
-        private IList<string>? m_processIgnoreList;
-        private IList<string>? m_classIgnoreList;
+        private IList<string>? m_processIncludeList;
+        private IList<string>? m_processInstanceIncludeList;
+        private IList<string>? m_classIncludeList;
         private bool m_multiMonitorSupport;
+        private string m_uiLanguage = LocalizationService.English;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
         private bool m_showFocus;
@@ -243,6 +257,7 @@ namespace FancyWM.ViewModels
                     NotifyVirtualDesktopServiceIncompatibility = settings.NotifyVirtualDesktopServiceIncompatibility;
                     AllocateNewPanelSpace = settings.AllocateNewPanelSpace;
                     AutoCollapsePanels = settings.AutoCollapsePanels;
+                    StackAppendRestoredTabsToEnd = settings.StackAppendRestoredTabsToEnd;
                     AutoSplitCount = settings.AutoSplitCount;
                     DelayReposition = settings.DelayReposition;
                     AnimateWindowMovement = settings.AnimateWindowMovement;
@@ -253,9 +268,11 @@ namespace FancyWM.ViewModels
                     WindowPadding = settings.WindowPadding;
                     PanelHeight = settings.PanelHeight;
                     PanelFontSize = settings.PanelFontSize;
-                    ProcessIgnoreList = settings.ProcessIgnoreList;
-                    ClassIgnoreList = settings.ClassIgnoreList;
+                    ProcessIncludeList = settings.ProcessIncludeList;
+                    ProcessInstanceIncludeList = settings.ProcessInstanceIncludeList;
+                    ClassIncludeList = settings.ClassIncludeList;
                     MultiMonitorSupport = settings.MultiMonitorSupport;
+                    UiLanguage = settings.UiLanguage;
                     ShowContextHints = settings.ShowContextHints;
                     SoundOnFailure = settings.SoundOnFailure;
                     ShowFocus = settings.ShowFocus;
@@ -368,6 +385,7 @@ namespace FancyWM.ViewModels
                     NotifyVirtualDesktopServiceIncompatibility = NotifyVirtualDesktopServiceIncompatibility,
                     AllocateNewPanelSpace = AllocateNewPanelSpace,
                     AutoCollapsePanels = AutoCollapsePanels,
+                    StackAppendRestoredTabsToEnd = StackAppendRestoredTabsToEnd,
                     AutoSplitCount = AutoSplitCount,
                     DelayReposition = DelayReposition,
                     AnimateWindowMovement = AnimateWindowMovement,
@@ -380,9 +398,11 @@ namespace FancyWM.ViewModels
                     PanelHeight = PanelHeight,
                     PanelFontSize = PanelFontSize,
                     ShowContextHints = ShowContextHints,
-                    ProcessIgnoreList = [.. ProcessIgnoreList!],
-                    ClassIgnoreList = [.. ClassIgnoreList!],
+                    ProcessIncludeList = [.. ProcessIncludeList!],
+                    ProcessInstanceIncludeList = [.. ProcessInstanceIncludeList!],
+                    ClassIncludeList = [.. ClassIncludeList!],
                     MultiMonitorSupport = MultiMonitorSupport,
+                    UiLanguage = UiLanguage,
                     SoundOnFailure = SoundOnFailure,
                     ShowFocus = ShowFocus,
                     ShowFocusDuringAction = ShowFocusDuringAction

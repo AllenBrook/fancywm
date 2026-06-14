@@ -178,6 +178,11 @@ namespace FancyWM.Utilities
             return GetCachedProcessInfo(window).name;
         }
 
+        public static int GetCachedProcessId(this IWindow window)
+        {
+            return GetCachedProcessInfo(window).id;
+        }
+
         public static string DebugString(this IWindow window)
         {
             var (id, name) = GetCachedProcessInfo(window);

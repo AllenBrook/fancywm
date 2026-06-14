@@ -405,11 +405,7 @@ namespace FancyWM
             {
                 using (m_backendLock.EnterScope())
                 {
-                    m_backend.WrapInStackPanel(node);
-                    node.Parent!.Padding = GetPanelPaddingRect();
-                    node.Parent!.Spacing = GetPanelSpacing();
-                    m_backend.SetFocus(node);
-                    InvalidateLayout();
+                    ApplyStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop, node);
                 }
             }
             catch (TilingFailedException ex)
@@ -417,6 +413,307 @@ namespace FancyWM
                 m_logger.Error(ex, "Attempted stack of {Node} failed", node);
                 PlacementFailed?.Invoke(this, new TilingFailedEventArgs(ex.FailReason));
             }
+        }
+
+        private void ApplyStackLayout(IVirtualDesktop desktop, TilingNode focusedNode)
+        {
+            var tree = m_backend.GetTree(desktop);
+            if (tree?.Root == null)
+                throw new TilingFailedException(TilingError.MissingTarget);
+
+            if (tree.Root.Windows.Count() > 1)
+            {
+                m_backend.StackAllWindows(desktop);
+            }
+            else
+            {
+                m_backend.WrapInStackPanel(focusedNode);
+                focusedNode.Parent!.Padding = GetPanelPaddingRect();
+                focusedNode.Parent!.Spacing = GetPanelSpacing();
+            }
+
+            foreach (var panel in tree.Root.Nodes.OfType<PanelNode>())
+            {
+                panel.Padding = GetPanelPaddingRect();
+                panel.Spacing = GetPanelSpacing();
+            }
+
+            m_backend.SetFocus(focusedNode);
+            InvalidateLayout();
+        }
+
+        private void SetPanelStackCore()
+        {
+            m_logger.Information("Setting panel stack for visible windows on display {Display}", m_display);
+            DiscoverWindows();
+
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+            var candidates = new HashSet<IWindow>();
+            foreach (var window in m_workspace.GetCurrentDesktopSnapshot())
+            {
+                if (window.State != WindowState.Minimized)
+                {
+                    candidates.Add(window);
+                }
+            }
+
+            using (m_windowSetLock.EnterScope())
+            {
+                foreach (var window in m_windowSet)
+                {
+                    if (window.State != WindowState.Minimized)
+                    {
+                        candidates.Add(window);
+                    }
+                }
+            }
+
+            var visibleWindows = candidates
+                .Where(IsWindowOnThisDisplay)
+                .Where(w => w.Position.Width > 0 && w.Position.Height > 0)
+                .ToList();
+
+            foreach (var window in visibleWindows)
+            {
+                if (!CanManage(window, ignoreFloating: true))
+                {
+                    continue;
+                }
+
+                if (window.State == WindowState.Maximized)
+                {
+                    try
+                    {
+                        window.SetState(WindowState.Restored);
+                    }
+                    catch (Exception ex) when (ex is Win32Exception or InvalidWindowReferenceException or InvalidOperationException)
+                    {
+                        m_logger.Debug(
+                            "Could not restore {Window} before panel stack: {Message}",
+                            window.DebugString(), ex.Message);
+                        continue;
+                    }
+                }
+
+                using (m_floatingSetLock.EnterScope())
+                {
+                    m_floatingSet.Remove(window);
+                }
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                var tree = m_backend.GetTree(desktop);
+                if (tree?.Root == null)
+                {
+                    return;
+                }
+
+                var stack = tree.Root.Children.OfType<StackPanelNode>().FirstOrDefault();
+                if (stack == null)
+                {
+                    stack = new StackPanelNode();
+                    tree.Root.Attach(stack);
+                }
+
+                foreach (var window in visibleWindows)
+                {
+                    if (!CanManage(window, ignoreFloating: true) || m_backend.HasWindow(window))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        var node = m_backend.RegisterWindow(window, stack);
+                        node.Parent!.Padding = GetPanelPaddingRect();
+                        node.Parent!.Spacing = GetPanelSpacing();
+                    }
+                    catch (NoValidPlacementExistsException)
+                    {
+                        PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
+                            TilingError.NoValidPlacementExists, window));
+                    }
+                    catch (WindowAlreadyRegisteredException)
+                    {
+                    }
+                    catch (InvalidWindowReferenceException)
+                    {
+                    }
+                }
+
+                if (!tree.Root.Windows.Any())
+                {
+                    return;
+                }
+
+                m_backend.StackAllWindows(desktop);
+
+                if (tree.Root.Children.OfType<StackPanelNode>().FirstOrDefault() is StackPanelNode stackPanel)
+                {
+                    foreach (var windowNode in stackPanel.Windows.ToList())
+                    {
+                        if (!ShouldManageVisualBasicWindow(windowNode.WindowReference))
+                        {
+                            m_backend.UnregisterWindow(windowNode.WindowReference);
+                        }
+                    }
+                }
+
+                foreach (var panel in tree.Root.Nodes.OfType<PanelNode>())
+                {
+                    panel.Padding = GetPanelPaddingRect();
+                    panel.Spacing = GetPanelSpacing();
+                }
+            }
+
+            InvalidateLayout();
+        }
+
+        private int CountTiledManagedWindows()
+        {
+            using (m_windowSetLock.EnterScope())
+            using (m_floatingSetLock.EnterScope())
+            {
+                var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+                return m_windowSet.Count(w =>
+                    CanManage(w)
+                    && !m_floatingSet.Contains(w)
+                    && desktop.HasWindow(w));
+            }
+        }
+
+        private void SaveShowDesktopLayoutSnapshotCore(IVirtualDesktop desktop)
+        {
+            var tree = m_backend.GetTree(desktop);
+            if (tree?.Root == null || !tree.Root.Windows.Any())
+                return;
+
+            m_showDesktopSnapshot = new ShowDesktopLayoutSnapshot
+            {
+                RootClone = (PanelNode)tree.Root.Clone(),
+                WindowRects = tree.Root.Windows.ToDictionary(
+                    w => w.WindowReference.Handle,
+                    w => w.ComputedRectangle),
+                FocusedWindowHandle = (m_backend.GetFocus(desktop) as WindowNode)?.WindowReference.Handle,
+            };
+        }
+
+        private void RestoreShowDesktopLayoutSnapshot()
+        {
+            if (m_showDesktopSnapshot == null)
+                return;
+
+            try
+            {
+                using (m_backendLock.EnterScope())
+                {
+                    var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+                    var tree = m_backend.GetTree(desktop);
+                    if (tree == null)
+                        return;
+
+                    var snapshot = m_showDesktopSnapshot;
+                    m_showDesktopSnapshot = null;
+
+                    var validWindows = GetRestoredTiledWindows(desktop);
+                    if (validWindows.Count == 0)
+                        return;
+
+                    tree.Root = snapshot.RootClone;
+
+                    foreach (var windowNode in tree.Root!.Windows.ToList())
+                    {
+                        if (!validWindows.Contains(windowNode.WindowReference))
+                            windowNode.Remove(cleanup: true, collapse: false);
+                    }
+
+                    foreach (var panel in tree.Root.Nodes.OfType<PanelNode>())
+                    {
+                        panel.Padding = GetPanelPaddingRect();
+                        panel.Spacing = GetPanelSpacing();
+                    }
+
+                    try
+                    {
+                        tree.Measure();
+                        tree.Arrange();
+                    }
+                    catch (UnsatisfiableFlexConstraintsException)
+                    {
+                    }
+
+                    foreach (var windowNode in tree.Root.Windows)
+                    {
+                        if (!snapshot.WindowRects.TryGetValue(windowNode.WindowReference.Handle, out var rect))
+                            continue;
+
+                        if (windowNode.Parent is GridLikeNode gridNode)
+                        {
+                            if (gridNode.CanResizeInOrientation(PanelOrientation.Horizontal))
+                                gridNode.ResizeTo(windowNode, rect.Width, GrowDirection.Both);
+                            else
+                                gridNode.ResizeTo(windowNode, rect.Height, GrowDirection.Both);
+                        }
+                    }
+
+                    if (snapshot.FocusedWindowHandle is IntPtr focusedHandle)
+                    {
+                        var focusedWindow = validWindows.FirstOrDefault(w => w.Handle == focusedHandle);
+                        if (focusedWindow != null)
+                        {
+                            var focusNode = tree.FindNode(focusedWindow);
+                            if (focusNode != null)
+                                m_backend.SetFocus(focusNode);
+                        }
+                    }
+
+                    m_showDesktopAwaitingRestore = false;
+                    InvalidateLayout();
+                }
+            }
+            catch (Exception ex)
+            {
+                m_showDesktopAwaitingRestore = false;
+                m_logger.Error(ex, "Failed to restore show-desktop layout snapshot");
+            }
+        }
+
+        private bool ShouldDeferShowDesktopRestore(IWindow window)
+            => m_showDesktopAwaitingRestore
+                && m_showDesktopSnapshot?.WindowRects.ContainsKey(window.Handle) == true;
+
+        private bool AreAllShowDesktopWindowsReady(IVirtualDesktop desktop)
+        {
+            if (m_showDesktopSnapshot == null)
+                return false;
+
+            var restoredHandles = GetRestoredTiledWindows(desktop).Select(w => w.Handle).ToHashSet();
+            return m_showDesktopSnapshot.WindowRects.Keys.All(restoredHandles.Contains);
+        }
+
+        private HashSet<IWindow> GetRestoredTiledWindows(IVirtualDesktop desktop)
+        {
+            using (m_windowSetLock.EnterScope())
+            using (m_floatingSetLock.EnterScope())
+            {
+                return m_windowSet
+                    .Where(w => w.State == WindowState.Restored
+                        && CanManage(w)
+                        && !m_floatingSet.Contains(w)
+                        && desktop.HasWindow(w))
+                    .ToHashSet();
+            }
+        }
+
+        private async void ScheduleRestoreShowDesktopLayout()
+        {
+            var generation = ++m_showDesktopRestoreGeneration;
+            await Task.Delay(150);
+            if (generation != m_showDesktopRestoreGeneration || !m_active)
+                return;
+
+            RestoreShowDesktopLayoutSnapshot();
         }
 
         private IntPtr GetOverlayAnchor()
@@ -469,6 +766,48 @@ namespace FancyWM
                     m_floatingSet.Add(window);
                 }
             }
+
+            var processName = window.GetCachedProcessName();
+            var processId = window.GetCachedProcessId();
+            var instanceKey = ProcessInstanceRule.Format(processName, processId);
+            if (!floated)
+            {
+                using (m_autoTileProcessIdsLock.EnterScope())
+                {
+                    m_autoTileProcessIds.Add(processId);
+                }
+
+                App.Current.AppState.Settings.SaveAsync(x =>
+                {
+                    if (x.ProcessInstanceIncludeList.Contains(instanceKey))
+                    {
+                        return x;
+                    }
+
+                    return x with { ProcessInstanceIncludeList = [.. x.ProcessInstanceIncludeList, instanceKey] };
+                });
+            }
+            else if (!HasOtherTiledInstances(window, processId))
+            {
+                using (m_autoTileProcessIdsLock.EnterScope())
+                {
+                    m_autoTileProcessIds.Remove(processId);
+                }
+
+                App.Current.AppState.Settings.SaveAsync(x =>
+                {
+                    if (!x.ProcessInstanceIncludeList.Contains(instanceKey))
+                    {
+                        return x;
+                    }
+
+                    return x with
+                    {
+                        ProcessInstanceIncludeList = x.ProcessInstanceIncludeList.Where(k => k != instanceKey).ToList(),
+                    };
+                });
+            }
+
             DetectChanges(window);
             if (floated)
             {
@@ -487,6 +826,8 @@ namespace FancyWM
                 {
                 }
             }
+
+            InvalidateLayout();
         }
 
         private void OnDisplayScalingChanged(object? sender, DisplayScalingChangedEventArgs e)
@@ -822,16 +1163,31 @@ namespace FancyWM
 
         private void OnWindowIgnoreProcessRequested(object? sender, WindowNode e)
         {
+            var processName = e.WindowReference.GetCachedProcessName();
+            var instanceKey = ProcessInstanceRule.Format(processName, e.WindowReference.GetCachedProcessId());
             App.Current.AppState.Settings.SaveAsync(x =>
             {
-                return x with { ProcessIgnoreList = [.. x.ProcessIgnoreList, e.WindowReference.GetCachedProcessName()] };
+                if (x.ProcessInstanceIncludeList.Contains(instanceKey))
+                {
+                    return x;
+                }
+
+                return x with { ProcessInstanceIncludeList = [.. x.ProcessInstanceIncludeList, instanceKey] };
             });
         }
         private void OnWindowIgnoreClassRequested(object? sender, WindowNode e)
         {
+            SaveClassIncludeRule(e.WindowReference);
+        }
+
+        private void SaveClassIncludeRule(IWindow window)
+        {
+            var className = ((WinMan.Windows.Win32Window)window).ClassName;
             App.Current.AppState.Settings.SaveAsync(x =>
             {
-                return x with { ClassIgnoreList = [.. x.ClassIgnoreList, ((WinMan.Windows.Win32Window)e.WindowReference).ClassName] };
+                if (x.ClassIncludeList.Contains(className))
+                    return x;
+                return x with { ClassIncludeList = [.. x.ClassIncludeList, className] };
             });
         }
 
@@ -872,6 +1228,28 @@ namespace FancyWM
             {
                 PlacementFailed?.Invoke(this, new TilingFailedEventArgs(e.FailReason));
             }
+        }
+
+        private void OnStackTabReorderRequested(object? sender, Controls.StackTabReorderRoutedEventArgs e)
+        {
+            using (m_backendLock.EnterScope())
+            {
+                var childCount = e.Stack.Children.Count;
+                if (e.FromIndex < 0
+                    || e.FromIndex >= childCount
+                    || childCount <= 1)
+                {
+                    return;
+                }
+
+                var toIndex = Math.Clamp(e.ToIndex, 0, childCount - 1);
+                if (e.FromIndex != toIndex)
+                {
+                    e.Stack.Move(e.FromIndex, toIndex);
+                }
+            }
+
+            InvalidateLayout();
         }
 
         private void OnTilingNodePullUpRequested(object? sender, TilingNode node)
@@ -1003,25 +1381,22 @@ namespace FancyWM
                     m_newWindowSet.Add(e.Source);
                 }
 
-                if (m_exclusionMatchers.Any(x => x.Matches(e.Source)))
+                using (m_floatingSetLock.EnterScope())
+                {
+                    m_floatingSet.Add(e.Source);
+                }
+
+                if (ShouldAutoTile(e.Source))
                 {
                     using (m_floatingSetLock.EnterScope())
                     {
-                        m_floatingSet.Add(e.Source);
+                        m_floatingSet.Remove(e.Source);
                     }
                 }
 
-                if (!AutoRegisterWindows)
+                if (!AutoRegisterWindows || m_showDesktopAwaitingRestore)
                 {
                     return;
-                }
-
-                if (m_autoFloatNewWindows)
-                {
-                    using (m_floatingSetLock.EnterScope())
-                    {
-                        m_floatingSet.Add(e.Source);
-                    }
                 }
 
                 if (CanManage(e.Source) && e.Source.State == WindowState.Restored)
@@ -1035,7 +1410,7 @@ namespace FancyWM
                             {
                                 using (m_backendLock.EnterScope())
                                 {
-                                    if (m_backend.HasWindow(e.Source))
+                                    if (m_showDesktopAwaitingRestore || m_backend.HasWindow(e.Source))
                                     {
                                         return;
                                     }
@@ -1282,11 +1657,21 @@ namespace FancyWM
                     var window = m_backend.FindWindow(e.Source);
                     if (window != null)
                     {
+                        bool isFirstSaved;
                         using (m_savedLocationsLock.EnterScope())
                         {
                             // Be resilient to multiple OnWindowStateChanged events happening one after the other
+                            isFirstSaved = m_savedLocations.Count == 0;
                             m_savedLocations[e.Source] = new NodeLocation(window);
+
+                            var tiledCount = CountTiledManagedWindows();
+                            if (tiledCount > 0 && m_savedLocations.Count >= tiledCount)
+                                m_showDesktopAwaitingRestore = true;
                         }
+
+                        if (isFirstSaved)
+                            SaveShowDesktopLayoutSnapshotCore(m_workspace.VirtualDesktopManager.CurrentDesktop);
+
                         InvalidateLayout();
                         m_backend.UnregisterWindow(e.Source);
                     }
@@ -1296,7 +1681,23 @@ namespace FancyWM
 
             void RegisterAndRestoreLocation()
             {
+                if (ShouldDeferShowDesktopRestore(e.Source))
+                {
+                    using (m_savedLocationsLock.EnterScope())
+                    {
+                        m_savedLocations.Remove(e.Source);
+                    }
+
+                    if (AreAllShowDesktopWindowsReady(m_workspace.VirtualDesktopManager.CurrentDesktop))
+                        ScheduleRestoreShowDesktopLayout();
+
+                    return;
+                }
+
                 NodeLocation? savedLocation;
+                if (!m_showDesktopAwaitingRestore)
+                    m_showDesktopSnapshot = null;
+
                 using (m_savedLocationsLock.EnterScope())
                 {
                     if (m_savedLocations.TryGetValue(e.Source, out savedLocation))
@@ -1348,7 +1749,9 @@ namespace FancyWM
 
                     window.Parent!.Detach(window);
                     int childCount = savedLocation.Parent.Children.Count;
-                    int index = Math.Min(savedLocation.Index, childCount);
+                    int index = m_stackAppendRestoredTabsToEnd && savedLocation.Parent is StackPanelNode
+                        ? childCount
+                        : Math.Min(savedLocation.Index, childCount);
                     savedLocation.Parent.Attach(index, window);
 
                     // Restore size
@@ -1554,7 +1957,7 @@ namespace FancyWM
             {
                 if (window.State == WindowState.Restored && CanManage(window))
                 {
-                    if (!AutoRegisterWindows)
+                    if (!AutoRegisterWindows || m_showDesktopAwaitingRestore)
                     {
                         return false;
                     }
@@ -1615,19 +2018,132 @@ namespace FancyWM
             return false;
         }
 
+        private void ResetLayoutCore()
+        {
+            m_logger.Information("Resetting window layout for display {Display}", m_display);
+
+            m_pendingIntent?.Cancel();
+            m_pendingIntent = null;
+
+            m_showDesktopSnapshot = null;
+            m_showDesktopAwaitingRestore = false;
+            ++m_showDesktopRestoreGeneration;
+
+            using (m_savedLocationsLock.EnterScope())
+            {
+                m_savedLocations.Clear();
+            }
+
+            using (m_ignoreRepositionSetLock.EnterScope())
+            {
+                m_ignoreRepositionSet.Clear();
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                foreach (var desktop in m_workspace.VirtualDesktopManager.Desktops.ToList())
+                {
+                    var tree = m_backend.GetTree(desktop);
+                    if (tree?.Root != null)
+                    {
+                        foreach (var windowNode in tree.Root.Windows.ToList())
+                        {
+                            try
+                            {
+                                m_backend.UnregisterWindow(windowNode.WindowReference);
+                            }
+                            catch (Exception ex)
+                            {
+                                m_logger.Warning(ex, "Failed to unregister window during layout reset");
+                            }
+                        }
+                    }
+
+                    try
+                    {
+                        m_backend.UnregisterDesktop(desktop);
+                    }
+                    catch (ArgumentException)
+                    {
+                    }
+
+                    var orientation = m_display.Bounds.Width >= m_display.Bounds.Height
+                        ? PanelOrientation.Horizontal
+                        : PanelOrientation.Vertical;
+                    m_backend.RegisterDesktop(desktop, m_display.WorkArea, orientation);
+                }
+            }
+
+            using (m_floatingSetLock.EnterScope())
+            using (m_windowSetLock.EnterScope())
+            {
+                foreach (var window in m_windowSet.Where(IsWindowOnThisDisplay))
+                {
+                    if (ShouldAutoTile(window))
+                    {
+                        m_floatingSet.Remove(window);
+                    }
+                    else
+                    {
+                        m_floatingSet.Add(window);
+                    }
+                }
+            }
+
+            DiscoverWindows();
+            Refresh();
+            InvalidateLayout();
+        }
+
+        private static long IntersectionArea(Rectangle a, Rectangle b)
+        {
+            int left = Math.Max(a.Left, b.Left);
+            int top = Math.Max(a.Top, b.Top);
+            int right = Math.Min(a.Right, b.Right);
+            int bottom = Math.Min(a.Bottom, b.Bottom);
+            if (right <= left || bottom <= top)
+            {
+                return 0;
+            }
+
+            return (long)(right - left) * (bottom - top);
+        }
+
+        private IDisplay? GetOwningDisplay(IWindow window)
+        {
+            var center = window.Position.Center;
+            var byCenter = m_workspace.DisplayManager.Displays
+                .FirstOrDefault(d => d.Bounds.Contains(center));
+            if (byCenter != null)
+            {
+                return byCenter;
+            }
+
+            IDisplay? best = null;
+            long bestArea = 0;
+            var rect = window.Position;
+            foreach (var display in m_workspace.DisplayManager.Displays)
+            {
+                var area = IntersectionArea(display.Bounds, rect);
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = display;
+                }
+            }
+
+            return bestArea > 0 ? best : null;
+        }
+
+        private bool IsWindowOnThisDisplay(IWindow window)
+        {
+            var owner = GetOwningDisplay(window);
+            return owner != null && owner.Equals(m_display);
+        }
+
         private bool CanManage(IWindow x, bool ignoreFloating = false)
         {
-            bool IsOnCurrentDisplay()
-            {
-                var pos = x.Position.Center;
-                if (m_display.Bounds.Contains(pos))
-                    return true;
-
-                // Check if on any other displays
-                return !m_workspace.DisplayManager.Displays
-                    .Where(d => !d.Equals(m_display) && d.Bounds.Contains(pos))
-                    .Any();
-            }
+            bool IsOnCurrentDisplay() => IsWindowOnThisDisplay(x);
             bool IsFloating()
             {
                 using (m_floatingSetLock.EnterScope())
@@ -1654,13 +2170,8 @@ namespace FancyWM
                 return false;
             }
 
-            // GetWindowStyle + OpenProcess
-            if (!x.CanResize)
-            {
-                return false;
-            }
-
-            // OpenProcess (expensive)
+            // OpenProcess (expensive). Move-only windows (e.g. fixed-size VB6 forms) are
+            // still supported: the layout engine repositions them without resizing.
             if (!x.CanMove)
             {
                 return false;
@@ -1672,7 +2183,76 @@ namespace FancyWM
                 return false;
             }
 
+            if (!ShouldManageVisualBasicWindow(x))
+            {
+                return false;
+            }
+
             return true;
+        }
+
+        private IEnumerable<IWindow> GetVisualBasicPeersOnDisplay(int processId)
+        {
+            var peers = new HashSet<IWindow>();
+            foreach (var window in m_workspace.GetSnapshot())
+            {
+                if (!IsWindowOnThisDisplay(window))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (window.GetCachedProcessId() == processId)
+                    {
+                        peers.Add(window);
+                    }
+                }
+                catch (InvalidWindowReferenceException)
+                {
+                }
+            }
+
+            using (m_windowSetLock.EnterScope())
+            {
+                foreach (var window in m_windowSet)
+                {
+                    if (!IsWindowOnThisDisplay(window))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (window.GetCachedProcessId() == processId)
+                        {
+                            peers.Add(window);
+                        }
+                    }
+                    catch (InvalidWindowReferenceException)
+                    {
+                    }
+                }
+            }
+
+            return peers;
+        }
+
+        private bool ShouldManageVisualBasicWindow(IWindow window)
+        {
+            try
+            {
+                if (!VisualBasicWindowRules.IsVisualBasicProcess(window.GetCachedProcessName()))
+                {
+                    return true;
+                }
+
+                return VisualBasicWindowRules.ShouldManage(window, GetVisualBasicPeersOnDisplay(window.GetCachedProcessId()));
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return true;
+            }
         }
 
         private void InvalidateLayout()
@@ -1787,13 +2367,93 @@ namespace FancyWM
             InvalidateLayout();
         }
 
+        private bool HasOtherTiledInstances(IWindow window, int processId)
+        {
+            using (m_windowSetLock.EnterScope())
+            using (m_floatingSetLock.EnterScope())
+            {
+                return m_windowSet.Any(w =>
+                    w != window
+                    && w.GetCachedProcessId() == processId
+                    && !m_floatingSet.Contains(w)
+                    && CanManage(w, ignoreFloating: true));
+            }
+        }
+
+        private bool ShouldAutoTile(IWindow window)
+        {
+            if (m_inclusionMatchers.Any(x => x.Matches(window)))
+            {
+                return true;
+            }
+
+            using (m_autoTileProcessIdsLock.EnterScope())
+            {
+                return m_autoTileProcessIds.Contains(window.GetCachedProcessId());
+            }
+        }
+
+        private void EnsureWindowTiled(IWindow window)
+        {
+            if (!CanManage(window, ignoreFloating: true))
+                return;
+
+            bool shouldRegister;
+            using (m_floatingSetLock.EnterScope())
+            {
+                shouldRegister = m_floatingSet.Remove(window);
+            }
+
+            if (!shouldRegister)
+            {
+                using (m_backendLock.EnterScope())
+                {
+                    if (m_backend.HasWindow(window))
+                        return;
+                }
+                shouldRegister = true;
+            }
+
+            if (shouldRegister)
+                DetectChanges(window);
+        }
+
+        private TilingNode? GetFocusedTilingNode(bool ensureManaged = false)
+        {
+            var window = m_workspace.FocusedWindow;
+            if (window != null && ensureManaged)
+                EnsureWindowTiled(window);
+
+            if (window != null)
+            {
+                using (m_backendLock.EnterScope())
+                {
+                    var node = m_backend.FindWindow(window);
+                    if (node != null)
+                        return node;
+                }
+
+                if (!ensureManaged)
+                    return null;
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                return m_backend.GetFocus(m_workspace.VirtualDesktopManager.CurrentDesktop);
+            }
+        }
+
         bool HasFocusAndAdjacentWindow(TilingDirection direction)
         {
             try
             {
+                var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+                if (focusedNode == null)
+                    return false;
+
                 using (m_backendLock.EnterScope())
                 {
-                    m_backend.GetFocusAndAdjacentWindow(m_workspace.VirtualDesktopManager.CurrentDesktop, direction);
+                    _ = focusedNode.GetAdjacentWindow(direction) ?? throw new TilingFailedException(TilingError.MissingAdjacentWindow);
                     return true;
                 }
             }

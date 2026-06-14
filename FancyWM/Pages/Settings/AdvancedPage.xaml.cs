@@ -6,6 +6,7 @@ using System.Windows.Controls;
 
 using FancyWM.Resources;
 using FancyWM.ViewModels;
+using FancyWM.Windows;
 
 using Microsoft.Win32;
 
@@ -26,6 +27,9 @@ namespace FancyWM.Pages.Settings
             {
                 AppVersionText = GetVersionString(),
             };
+            ResetLayoutCaption.Text = GetString("Advanced.ResetLayout.Caption");
+            ResetLayoutDescription.Text = GetString("Advanced.ResetLayout.Description");
+            ResetLayoutButton.Content = GetString("Advanced.ResetLayout.Caption");
         }
 
         public AdvancedPage(SettingsViewModel _) : this()
@@ -50,6 +54,24 @@ namespace FancyWM.Pages.Settings
             {
                 return Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString() ?? "0.0.0.0";
             }
+        }
+
+        private static string GetString(string name)
+            => Strings.ResourceManager.GetString(name, Strings.Culture) ?? name;
+
+        private void OnResetLayoutClick(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (new MessageBox
+            {
+                IconGlyph = "\xE72C",
+                Title = GetString("Advanced.ResetLayout.Caption"),
+                Message = GetString("Advanced.ResetLayout.Confirm"),
+            }.ShowDialog() != true)
+            {
+                return;
+            }
+
+            MainWindow.RequestResetWindowLayout();
         }
 
         private async void CreateAhkScriptClick(object sender, System.Windows.RoutedEventArgs e)

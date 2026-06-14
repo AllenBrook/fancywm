@@ -27,6 +27,7 @@ using System.Threading;
 using FancyWM.Pages.Settings;
 using System.Media;
 using Microsoft.Extensions.DependencyInjection;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Text;
 using FancyWM.Resources;
@@ -65,6 +66,7 @@ namespace FancyWM
 
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
+        private ActivationHotkey m_activationHotkey = ActivationHotkey.Default;
 
         private readonly TaskbarIcon m_notifyIcon;
         private readonly CountdownTimer m_hideCountdownTimer;
@@ -193,15 +195,17 @@ namespace FancyWM
                 }))
                 .Select(_ => Unit.Default);
 
-            var exclusionListSettings = settings
-                .DistinctUntilChanged(x => (x.ProcessIgnoreList, x.ClassIgnoreList))
+            var inclusionListSettings = settings
+                .DistinctUntilChanged(x => (x.ProcessIncludeList, x.ProcessInstanceIncludeList, x.ClassIncludeList))
                 .Do(async x => await Dispatcher.InvokeAsync(() =>
                 {
-                    var processMatchers = x.ProcessIgnoreList.Select(x => new ByProcessNameMatcher(x));
-                    var classMatchers = x.ClassIgnoreList.Select(x => new ByClassNameMatcher(x));
-                    m_tiling!.ExclusionMatchers = m_tiling.ExclusionMatchers
-                        .Where(m => m is not ByProcessNameMatcher && m is not ByClassNameMatcher)
+                    var processMatchers = x.ProcessIncludeList.Select(x => new ByProcessNameMatcher(x));
+                    var processInstanceMatchers = x.ProcessInstanceIncludeList.Select(x => new ByProcessInstanceMatcher(x));
+                    var classMatchers = x.ClassIncludeList.Select(x => new ByClassNameMatcher(x));
+                    m_tiling!.InclusionMatchers = m_tiling.InclusionMatchers
+                        .Where(m => m is not ByProcessNameMatcher && m is not ByClassNameMatcher && m is not ByProcessInstanceMatcher)
                         .Concat(processMatchers)
+                        .Concat(processInstanceMatchers)
                         .Concat(classMatchers)
                         .ToArray();
                 }))
@@ -217,7 +221,7 @@ namespace FancyWM
                 activateOnCapsLockSetting.Subscribe(new NotifyUnhandledObserver<bool>()),
                 keybindingsSettings.Subscribe(new NotifyUnhandledObserver<KeybindingDictionary>()),
                 multiMonitorObservable
-                    .Concat(exclusionListSettings)
+                    .Concat(inclusionListSettings)
                     .Subscribe(new NotifyUnhandledObserver<Unit>()),
             ];
 
@@ -232,6 +236,18 @@ namespace FancyWM
 
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
+            var setPanelStackMenuItem = new MenuItem
+            {
+                Header = Strings.ResourceManager.GetString("Tray.SetPanelStack.Caption", Strings.Culture) ?? "Set panel stack",
+            };
+            setPanelStackMenuItem.Click += OnSetPanelStackClick;
+            m_contextMenu.Items.Insert(1, setPanelStackMenuItem);
+            var resetLayoutMenuItem = new MenuItem
+            {
+                Header = Strings.ResourceManager.GetString("Advanced.ResetLayout.Caption", Strings.Culture) ?? "Reset window layout",
+            };
+            resetLayoutMenuItem.Click += OnResetLayoutClick;
+            m_contextMenu.Items.Insert(2, resetLayoutMenuItem);
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -250,7 +266,7 @@ namespace FancyWM
             if (App.Current.Services.GetService<IMicaProvider>() is IMicaProvider micaProvider)
             {
                 m_micaProvider = micaProvider;
-                App.Current.Resources["MicaPrimaryColor"] = m_micaProvider.PrimaryColor;
+                UpdateMicaResources();
                 m_micaProvider.PrimaryColorChanged += OnMicaProviderPrimaryColorChanged;
             }
 
@@ -344,10 +360,22 @@ namespace FancyWM
 
         private void OnMicaProviderPrimaryColorChanged(object? sender, MicaOptionsChangedEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(UpdateMicaResources);
+        }
+
+        private void UpdateMicaResources()
+        {
+            var primary = m_micaProvider.PrimaryColor;
+            if (primary.A == 0)
             {
-                App.Current.Resources["MicaPrimaryColor"] = m_micaProvider.PrimaryColor;
-            });
+                primary = Application.Current.Resources["SystemAccentColorLight3"] is Color accentLight
+                    ? accentLight
+                    : Application.Current.Resources["SystemAccentColor"] is Color accent
+                        ? accent
+                        : primary;
+            }
+
+            App.Current.Resources["MicaPrimaryColor"] = primary;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -454,6 +482,8 @@ namespace FancyWM
 
         private void RebindActivationHotkey(ActivationHotkey hk)
         {
+            m_activationHotkey = hk;
+
             if (m_cmdHks != null)
             {
                 foreach (var cmdHk in m_cmdHks)
@@ -592,6 +622,8 @@ namespace FancyWM
 
         private async void OnCommandKey(IReadOnlySet<KeyCode> keys)
         {
+            keys = StripActivationModifiers(keys);
+
             // This is to allow for focus to return to the window before movement
             await Task.Delay(50);
 
@@ -952,6 +984,26 @@ namespace FancyWM
             };
         }
 
+        internal void ResetWindowLayout()
+        {
+            if (m_tiling == null)
+            {
+                return;
+            }
+
+            m_logger.Information("Resetting window layout for all displays");
+            m_tiling.ResetLayout();
+        }
+
+        internal static void RequestResetWindowLayout()
+        {
+            foreach (var window in App.Current.Windows.OfType<MainWindow>())
+            {
+                window.ResetWindowLayout();
+                return;
+            }
+        }
+
         internal static void OpenSettings()
         {
             if (App.Current.Windows.OfType<SettingsWindow>().Any())
@@ -992,11 +1044,50 @@ namespace FancyWM
             }
         }
 
-        private async void OnCmdSequenceBegin(object? sender, EventArgs e)
+        private static KeyCode RemapSideAgnosticKey(KeyCode key)
+        {
+            return key switch
+            {
+                KeyCode.RightShift => KeyCode.LeftShift,
+                KeyCode.RightCtrl => KeyCode.LeftCtrl,
+                KeyCode.RWin => KeyCode.LWin,
+                KeyCode.RightAlt => KeyCode.LeftAlt,
+                _ => key,
+            };
+        }
+
+        private IReadOnlySet<KeyCode> StripActivationModifiers(IReadOnlySet<KeyCode> keys)
+        {
+            if (m_activationHotkey.Key == KeyCode.None)
+            {
+                return keys;
+            }
+
+            var filtered = new HashSet<KeyCode>();
+            foreach (var key in keys)
+            {
+                var normalized = RemapSideAgnosticKey(key);
+                if (normalized == RemapSideAgnosticKey(m_activationHotkey.Key))
+                {
+                    continue;
+                }
+
+                if (m_activationHotkey.ModifierKeys.Any(mod => normalized == RemapSideAgnosticKey(mod)))
+                {
+                    continue;
+                }
+
+                filtered.Add(key);
+            }
+
+            return filtered;
+        }
+
+        private void OnCmdSequenceBegin(object? sender, EventArgs e)
         {
             long currentId = ++m_cmdSequenceId;
 
-            m_logger.Debug($"Command sequence {m_cmdSequenceId} started");
+            m_logger.Debug($"Command sequence {currentId} started");
             if (m_stopwatch.Elapsed >= RateReviewDelay && m_enableRateReviewRequests)
             {
                 m_enableRateReviewRequests = false;
@@ -1004,42 +1095,40 @@ namespace FancyWM
                 m_notifyIcon.ShowBalloonTip(Strings.Messages_EnjoyingFancyWM, Strings.Messages_AskForReview, BalloonIcon.None);
             }
 
-            await Dispatcher.InvokeAsync(async () =>
+            var cts = new CancellationTokenSource(m_showContextHints ? ToastDurationCommandSequenceWithContextHints : ToastDurationCommandSequence);
+            var keyListener = new LowLevelKeyPatternListener(m_llkbdHook);
+            keyListener.PatternChanged += (_, patternArgs) =>
             {
-                var cts = new CancellationTokenSource(m_showContextHints ? ToastDurationCommandSequenceWithContextHints : ToastDurationCommandSequence);
-                var toast = Dispatcher.RunAsync(async () =>
+                m_logger.Debug($"Command sequence {currentId} detected");
+                cts.Cancel();
+                if (currentId == m_cmdSequenceId)
                 {
-                    try
-                    {
-                        // Yield so that the UI elements for the action toast are created on the next event loop tick,
-                        // without slowing down LowLevelKeyPatternListener hooking.
-                        await Task.Yield();
-                        await ShowWaitingForActionToast(m_showContextHints, cts.Token);
-                    }
-                    catch (Exception e)
-                    {
-                        Dispatcher.RethrowOnDispatcher(e);
-                    }
-                });
+                    OnCommandKey(patternArgs.Keys);
+                }
+            };
 
-                using var keyListener = new LowLevelKeyPatternListener(m_llkbdHook);
-                keyListener.PatternChanged += (s, e) =>
-                {
-                    m_logger.Debug($"Command sequence {currentId} detected");
-                    cts.Cancel();
-                    keyListener.Dispose();
-                    if (currentId == m_cmdSequenceId)
-                    {
-                        OnCommandKey(e.Keys);
-                    }
-                };
+            _ = RunCommandSequenceAsync(currentId, cts, keyListener);
+        }
 
+        private async Task RunCommandSequenceAsync(long currentId, CancellationTokenSource cts, LowLevelKeyPatternListener keyListener)
+        {
+            try
+            {
                 bool showFocus = m_showFocusDuringAction;
                 if (showFocus)
                 {
                     m_tiling.ShowPreviewFocus = true;
                 }
-                await toast;
+
+                try
+                {
+                    await Task.Yield();
+                    await ShowWaitingForActionToast(m_showContextHints, cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
                 if (showFocus)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(300));
@@ -1048,8 +1137,13 @@ namespace FancyWM
                         m_tiling.ShowPreviewFocus = false;
                     }
                 }
+
                 m_logger.Debug($"Command sequence {currentId} ended");
-            });
+            }
+            finally
+            {
+                keyListener.Dispose();
+            }
         }
 
         private Task ShowToastAsync(string messageText, TimeSpan duration)
@@ -1550,23 +1644,53 @@ namespace FancyWM
             OpenSettings();
         }
 
+        private void OnSetPanelStackClick(object? sender, RoutedEventArgs e)
+        {
+            m_logger.Debug("Set panel stack requested from tray menu");
+            m_contextMenu.IsOpen = false;
+            if (m_tiling == null)
+            {
+                return;
+            }
+
+            try
+            {
+                m_tiling.SetPanelStack();
+            }
+            catch (TilingFailedException ex)
+            {
+                _ = HandleCommandExceptionAsync(ex, "set panel stack");
+            }
+        }
+
+        private void OnRestartClick(object? sender, RoutedEventArgs e)
+        {
+            m_logger.Debug("Application restart requested!");
+            m_contextMenu.IsOpen = false;
+            App.Current.RequestRestart();
+        }
+
+        private void OnResetLayoutClick(object? sender, RoutedEventArgs e)
+        {
+            m_contextMenu.IsOpen = false;
+            if (new Windows.MessageBox
+            {
+                IconGlyph = "\xE72C",
+                Title = Strings.ResourceManager.GetString("Advanced.ResetLayout.Caption", Strings.Culture) ?? "Reset window layout",
+                Message = Strings.ResourceManager.GetString("Advanced.ResetLayout.Confirm", Strings.Culture),
+            }.ShowDialog() != true)
+            {
+                return;
+            }
+
+            ResetWindowLayout();
+        }
+
         private void OnExitClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Application exit requested!");
             m_contextMenu.IsOpen = false;
             App.Current.Terminate();
-        }
-
-        private void OnSponsorClick(object? sender, RoutedEventArgs e)
-        {
-            App.Sponsor();
-        }
-
-        private void OnAboutClick(object? sender, RoutedEventArgs e)
-        {
-            m_logger.Debug("Opening about window...");
-            m_contextMenu.IsOpen = false;
-            new AboutWindow().Show();
         }
 
         protected override void OnClosing(CancelEventArgs e)

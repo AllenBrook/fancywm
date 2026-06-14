@@ -65,7 +65,7 @@
                     <TextBlock>
                         • <Run Text="{x:Static res:Strings.Overlay_Window_SingleClickToFocus}" />
                         <LineBreak />
-                        • <Run Text="{x:Static res:Strings.Overlay_Window_RightClickToPullUp}" />
+                        • <Run Text="{x:Static res:Strings.Overlay_Window_RightDragToReorderTab}" />
                     </TextBlock>
                 </StackPanel>
             </Button.ToolTip>
@@ -73,10 +73,6 @@
                 <MouseBinding
                     MouseAction="LeftClick"
                     Command="{Binding PrimaryActionCommand}"
-                    CommandParameter="{Binding}" />
-                <MouseBinding
-                    MouseAction="RightClick"
-                    Command="{Binding SecondaryActionCommand}"
                     CommandParameter="{Binding}" />
             </Button.InputBindings>
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">

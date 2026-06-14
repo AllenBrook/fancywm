@@ -13,8 +13,7 @@
     <Window.Resources>
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick" />
-            <MenuItem Header="Sponsor ❤️" Click="OnSponsorClick" />
-            <MenuItem Header="{x:Static res:Strings.About_Caption}" Click="OnAboutClick" />
+            <MenuItem Header="{x:Static res:Strings.ErrorMessageBox_RestartFancyWM}" Click="OnRestartClick" />
             <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick" />
         </ContextMenu>
     </Window.Resources>

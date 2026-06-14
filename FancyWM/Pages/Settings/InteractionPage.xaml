@@ -40,6 +40,16 @@
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel>
                     <DockPanel LastChildFill="True">
+                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=StackAppendRestoredTabsToEnd, Mode=TwoWay}" />
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_StackAppendRestoredTabsToEnd}" />
+                    </DockPanel>
+                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_StackAppendRestoredTabsToEnd_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource SettingsItemStyle}">
+                <StackPanel>
+                    <DockPanel LastChildFill="True">
                         <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=DelayReposition, Mode=TwoWay}" />
                         <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_DelayReposition}" />
                     </DockPanel>

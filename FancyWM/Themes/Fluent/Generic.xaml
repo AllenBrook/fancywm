@@ -7,6 +7,10 @@
     <SolidColorBrush x:Key="SystemAccentMediumHighBrush" Color="{DynamicResource SystemAccentColor}" Opacity="0.8" />
     <SolidColorBrush x:Key="SystemAccentHighBrush" Color="{DynamicResource SystemAccentColor}" Opacity="1" />
 
+    <sys:Double x:Key="MicaOpacity">0.2</sys:Double>
+    <Color x:Key="LightenLowColor">#FFF2F2F2</Color>
+    <Color x:Key="LightenMediumColor">#FFFFFFFF</Color>
+
     <Style x:Key="SettingsItemStyle" TargetType="Border">
         <Setter Property="Background">
             <Setter.Value>

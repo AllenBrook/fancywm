@@ -10,7 +10,7 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <ui:ScrollViewerEx VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding Path=ChildNodes}">
+        <ItemsControl x:Name="TabsItemsControl" ItemsSource="{Binding Path=ChildNodes}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <local:TilingNodeTab Width="{Binding Path=Overlay.TabWidth}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" DataContext="{Binding}" />

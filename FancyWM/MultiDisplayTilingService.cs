@@ -33,16 +33,16 @@ namespace FancyWM
             set => GetActiveTilingService().PendingIntent = value;
         }
 
-        public IReadOnlyCollection<IWindowMatcher> ExclusionMatchers
+        public IReadOnlyCollection<IWindowMatcher> InclusionMatchers
         {
-            get => m_exclusionMatchers;
+            get => m_inclusionMatchers;
             set
             {
                 foreach (var tiling in m_tilingServices.Values)
                 {
-                    tiling.ExclusionMatchers = value;
+                    tiling.InclusionMatchers = value;
                 }
-                m_exclusionMatchers = value;
+                m_inclusionMatchers = value;
             }
         }
 
@@ -69,7 +69,7 @@ namespace FancyWM
         private bool m_autoCollapse;
         private int m_autoSplitCount;
         private bool m_delayReposition;
-        private IReadOnlyCollection<IWindowMatcher> m_exclusionMatchers = [];
+        private IReadOnlyCollection<IWindowMatcher> m_inclusionMatchers = [];
         private readonly IObservable<ITilingServiceSettings> m_settings;
         private readonly object m_syncRoot = new();
 
@@ -86,7 +86,7 @@ namespace FancyWM
             {
                 var tiling = new TilingService(Workspace, display, animationThread, settings, true)
                 {
-                    ExclusionMatchers = m_exclusionMatchers,
+                    InclusionMatchers = m_inclusionMatchers,
                     ShowPreviewFocus = m_showPreviewFocus,
                 };
                 tiling.PlacementFailed += OnTilingFailed;
@@ -148,7 +148,7 @@ namespace FancyWM
                         var tiling = new TilingService(Workspace, e.Source, AnimationThread, m_settings, true)
                         {
                             ShowPreviewFocus = m_showPreviewFocus,
-                            ExclusionMatchers = m_exclusionMatchers,
+                            InclusionMatchers = m_inclusionMatchers,
                         };
                         tiling.PlacementFailed += OnTilingFailed;
                         tiling.PendingIntentChanged += OnPendingIntentChanged;
@@ -270,6 +270,18 @@ namespace FancyWM
             GetActiveTilingService().Stack();
         }
 
+        public void SetPanelStack()
+        {
+            lock (m_syncRoot)
+            {
+                foreach (var tiling in m_tilingServices.Values)
+                {
+                    tiling.DiscoverWindows();
+                    tiling.SetPanelStack();
+                }
+            }
+        }
+
         public bool DiscoverWindows()
         {
             bool anyChanges = false;
@@ -363,6 +375,17 @@ namespace FancyWM
                 foreach (var tiling in m_tilingServices.Values)
                 {
                     tiling.Start();
+                }
+            }
+        }
+
+        public void ResetLayout()
+        {
+            lock (m_syncRoot)
+            {
+                foreach (var tiling in m_tilingServices.Values)
+                {
+                    tiling.ResetLayout();
                 }
             }
         }

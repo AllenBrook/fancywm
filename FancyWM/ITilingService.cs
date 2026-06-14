@@ -27,12 +27,13 @@ namespace FancyWM
 
         bool ShowPreviewFocus { get; set; }
 
-        IReadOnlyCollection<IWindowMatcher> ExclusionMatchers { get; set; }
+        IReadOnlyCollection<IWindowMatcher> InclusionMatchers { get; set; }
 
         bool CanSplit(bool vertical);
         void Split(bool vertical);
         bool CanStack();
         void Stack();
+        void SetPanelStack();
         bool DiscoverWindows();
         void Refresh();
         bool CanFloat();
@@ -51,6 +52,7 @@ namespace FancyWM
 
         void Stop();
         void Start();
+        void ResetLayout();
         IWindow? GetFocus();
         Rectangle GetBounds();
         IWindow? FindClosest(Point center);

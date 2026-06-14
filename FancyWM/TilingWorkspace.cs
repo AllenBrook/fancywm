@@ -155,8 +155,40 @@ namespace FancyWM
             var state = GetValidatedState(window);
             var focusedNode = state.FocusedNode;
             var parent = ResolveParent(state, focusedNode);
+
+            if (TryGetRootStackPanel(state, out var rootStack)
+                && rootStack.Windows.Any(w => SharesProcessInstance(w.WindowReference, window)))
+            {
+                parent = rootStack;
+            }
+
             parent = ResolveParentWithWidthConstraint(parent, focusedNode, window, maxTreeWidth);
             return RegisterWindow(window, parent, focusedNode as WindowNode);
+        }
+
+        private static bool TryGetRootStackPanel(DesktopState state, out StackPanelNode stackPanel)
+        {
+            stackPanel = null!;
+            if (state.DesktopTree.Root?.Children.Count == 1
+                && state.DesktopTree.Root.Children[0] is StackPanelNode stack)
+            {
+                stackPanel = stack;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool SharesProcessInstance(IWindow existing, IWindow incoming)
+        {
+            try
+            {
+                return existing.GetCachedProcessId() == incoming.GetCachedProcessId();
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return false;
+            }
         }
 
         public WindowNode RegisterWindow(IWindow window, PanelNode parent, WindowNode? anchor = null)
@@ -487,6 +519,72 @@ namespace FancyWM
             else
             {
                 node.Embed(new StackPanelNode());
+            }
+        }
+
+        private static bool IsFullyStacked(PanelNode root)
+            => root.Children.Count == 1
+                && root.Children[0] is StackPanelNode stack
+                && stack.Children.Count > 0
+                && stack.Children.All(c => c is WindowNode);
+
+        internal bool IsFullyStacked(IVirtualDesktop desktop)
+            => m_states.GetState(desktop)?.DesktopTree.Root is PanelNode root && IsFullyStacked(root);
+
+        internal void StackAllWindows(IVirtualDesktop desktop)
+        {
+            if (m_states.GetState(desktop) is not DesktopState state)
+                return;
+
+            var root = state.DesktopTree.Root;
+            if (root == null)
+                return;
+
+            var windowNodes = root.Windows.ToList();
+            if (windowNodes.Count == 0)
+                return;
+
+            if (windowNodes.Count == 1)
+            {
+                var window = windowNodes[0];
+                if (IsFullyStacked(root))
+                    return;
+                WrapInStackPanel(window);
+                return;
+            }
+
+            var focusedNode = state.FocusedNode;
+
+            var stack = root.Children.OfType<StackPanelNode>().FirstOrDefault();
+            if (stack == null)
+            {
+                stack = new StackPanelNode();
+                root.Attach(stack);
+            }
+
+            MergeWindowsIntoStack(stack, windowNodes);
+
+            foreach (var child in root.Children.ToList())
+            {
+                if (child != stack)
+                {
+                    root.Detach(child);
+                }
+            }
+
+            if (focusedNode != null && windowNodes.Contains(focusedNode))
+                state.FocusedNode = focusedNode;
+        }
+
+        private static void MergeWindowsIntoStack(StackPanelNode stack, IReadOnlyList<WindowNode> windowNodes)
+        {
+            foreach (var window in windowNodes)
+            {
+                if (window.Parent == stack)
+                    continue;
+
+                window.Parent!.Detach(window);
+                stack.Attach(window);
             }
         }
 

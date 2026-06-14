@@ -18,19 +18,26 @@
         </Grid.ColumnDefinitions>
         <ui:SimpleStackPanel HorizontalAlignment="Left" Orientation="Vertical" Margin="12" Spacing="4">
             <TextBlock Text="{x:Static res:Strings.Rules_Caption}" Style="{DynamicResource TitleTextBlockStyle}" />
-            <TextBlock Margin="0, 20" Text="{x:Static res:Strings.Rules_FloatingWindows}" Style="{DynamicResource SubtitleTextBlockStyle}" />
+            <TextBlock Margin="0, 20" Text="{x:Static res:Strings.Rules_ManagedWindows}" Style="{DynamicResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel Orientation="Vertical">
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Rules_ProcessIgnoreList}" Margin="0, 0, 0, 16" />
-                    <controls:StringsListBox ItemsSource="{Binding ProcessIgnoreList, Mode=TwoWay}" />
-                    <TextBlock HorizontalAlignment="Stretch" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" TextWrapping="Wrap" Text="{x:Static res:Strings.Rules_ProcessIgnoreList_Description}" />
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Rules_ProcessIncludeList}" Margin="0, 0, 0, 16" />
+                    <controls:StringsListBox ItemsSource="{Binding ProcessIncludeList, Mode=TwoWay}" />
+                    <TextBlock HorizontalAlignment="Stretch" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" TextWrapping="Wrap" Text="{x:Static res:Strings.Rules_ProcessIncludeList_Description}" />
                 </StackPanel>
             </Border>
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel Orientation="Vertical">
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Rules_ClassIgnoreList}" Margin="0, 0, 0, 16" />
-                    <controls:StringsListBox ItemsSource="{Binding ClassIgnoreList, Mode=TwoWay}" />
-                    <TextBlock HorizontalAlignment="Stretch" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" TextWrapping="Wrap" Text="{x:Static res:Strings.Rules_ClassIgnoreList_Description}" />
+                    <TextBlock x:Name="ProcessInstanceIncludeListCaption" VerticalAlignment="Center" Margin="0, 0, 0, 16" />
+                    <controls:StringsListBox ItemsSource="{Binding ProcessInstanceIncludeList, Mode=TwoWay}" />
+                    <TextBlock x:Name="ProcessInstanceIncludeListDescription" HorizontalAlignment="Stretch" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+            <Border Style="{DynamicResource SettingsItemStyle}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Rules_ClassIncludeList}" Margin="0, 0, 0, 16" />
+                    <controls:StringsListBox ItemsSource="{Binding ClassIncludeList, Mode=TwoWay}" />
+                    <TextBlock HorizontalAlignment="Stretch" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" TextWrapping="Wrap" Text="{x:Static res:Strings.Rules_ClassIncludeList_Description}" />
                 </StackPanel>
             </Border>
         </ui:SimpleStackPanel>

@@ -525,20 +525,20 @@
   <data name="Rules.Caption" xml:space="preserve">
     <value>Правила</value>
   </data>
-  <data name="Rules.ClassIgnoreList" xml:space="preserve">
-    <value>Автоматично плаващ режим по клас на прозорец</value>
+  <data name="Rules.ClassIncludeList" xml:space="preserve">
+    <value>Automatically tile by window class</value>
   </data>
-  <data name="Rules.ClassIgnoreList.Description" xml:space="preserve">
-    <value>Режимът на плаващ прозорец ще бъде автоматично активиран за прозорци със съответстващ клас. Съответстването е независимо от главни/малки букви и можете да използвате регулярни изрази.</value>
+  <data name="Rules.ClassIncludeList.Description" xml:space="preserve">
+    <value>Windows with a matching window class will be automatically tiled. The matching is not case-sensitive and you may use regular expressions.</value>
   </data>
-  <data name="Rules.FloatingWindows" xml:space="preserve">
-    <value>Плаващи прозорци</value>
+  <data name="Rules.ManagedWindows" xml:space="preserve">
+    <value>Managed windows</value>
   </data>
-  <data name="Rules.ProcessIgnoreList" xml:space="preserve">
-    <value>Автоматично плаващ режим по име на процес</value>
+  <data name="Rules.ProcessIncludeList" xml:space="preserve">
+    <value>Automatically tile by process name</value>
   </data>
-  <data name="Rules.ProcessIgnoreList.Description" xml:space="preserve">
-    <value>Режимът на плаващ прозорец ще бъде автоматично активиран за прозорци, принадлежащи на един от процесите. Въведете едно име на процес на ред, без разширението ".exe" (например "explorer"). Съответстването е независимо от главни/малки букви и можете да използвате регулярни изрази.</value>
+  <data name="Rules.ProcessIncludeList.Description" xml:space="preserve">
+    <value>Windows belonging to one of the listed processes will be automatically tiled. Enter one process name per line, excluding the ".exe" extension (e.g. "explorer"). The matching is not case-sensitive and you may use regular expressions.</value>
   </data>
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
@@ -679,10 +679,10 @@
     <value>Рестартиране на FancyWM</value>
   </data>
   <data name="Overlay.Window.AddRuleForClass" xml:space="preserve">
-    <value>Добавяне на правило за плаващ режим по клас на прозорец</value>
+    <value>Add tiling rule for window class</value>
   </data>
   <data name="Overlay.Window.AddRuleForProcess" xml:space="preserve">
-    <value>Добавяне на правило за плаващ режим по име на процес</value>
+    <value>Add tiling rule for process</value>
   </data>
   <data name="Overlay.Window.MoreOptions" xml:space="preserve">
     <value>Още опции</value>

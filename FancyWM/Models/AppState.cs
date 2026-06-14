@@ -13,7 +13,7 @@ namespace FancyWM.Models
             Settings = new ObservableJsonEntityWithCommentPreservation<Settings>(Path.GetFullPath("settings.json"),
                 () => new Settings
                 {
-                    AutoCollapsePanels = true,
+                    AutoFloatNewWindows = true,
                 },
                 new JsonSerializerOptions
                 {

@@ -148,6 +148,12 @@ namespace FancyWM
             Shutdown();
         }
 
+        internal void RequestRestart()
+        {
+            FancyWM.Startup.LaunchRestartHelper();
+            Terminate();
+        }
+
         private async void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             var exception = (Exception)e.ExceptionObject!;

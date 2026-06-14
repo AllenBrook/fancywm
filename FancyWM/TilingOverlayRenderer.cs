@@ -20,6 +20,7 @@ namespace FancyWM
         public event EventHandler<PanelNode>? TilingPanelMoveRequested;
         public event EventHandler<PanelNode>? TilingPanelMoving;
         public event EventHandler<TilingNode>? TilingNodeFocusRequested;
+        public event EventHandler<StackTabReorderRoutedEventArgs>? StackTabReorderRequested;
         public event EventHandler<TilingNode>? TilingNodePullUpRequested;
         public event EventHandler<TilingNode>? TilingNodeCloseRequested;
 
@@ -151,6 +152,7 @@ namespace FancyWM
                 Draggable.AddDragStartedHandler(overlayView, OnDragStarted);
                 Draggable.AddDragCompletedHandler(overlayView, OnDragCompleted);
                 Draggable.AddDraggingHandler(overlayView, OnDraggingEvent);
+                TabBar.AddTabReorderRequestedHandler(overlayView, OnStackTabReorderRequested);
                 m_overlay.Content = overlayView;
 
                 m_overlay.NonHitTestableContent = new NonHitTestableTilingOverlay
@@ -187,22 +189,7 @@ namespace FancyWM
 
             foreach (var removedNode in removeList)
             {
-                if (m_nodeViewModels.TryGetValue(removedNode, out var vm))
-                {
-                    m_nodeViewModels.Remove(removedNode);
-                    switch (vm)
-                    {
-                        case TilingPanelViewModel panelViewModel:
-                            m_viewModel.PanelElements.Remove(panelViewModel);
-                            break;
-                        case TilingWindowViewModel windowViewModel:
-                            m_viewModel.WindowElements.Remove(windowViewModel);
-                            break;
-                        default:
-                            continue;
-                    }
-                    vm.Dispose();
-                }
+                DisposeViewModel(removedNode);
             }
 
             foreach (var addedNode in addList)
@@ -236,6 +223,90 @@ namespace FancyWM
                         continue;
                 }
             }
+
+            foreach (var stackNode in snapshot.OfType<StackPanelNode>())
+            {
+                if (GetViewModel(stackNode) is TilingPanelViewModel stackViewModel)
+                {
+                    SyncChildNodes(stackViewModel, stackNode, focusedPath);
+                    stackViewModel.ChildHasDirectFocus = stackViewModel.ChildNodes
+                        .Select(x => x.Node)
+                        .Contains(focusedPath.FirstOrDefault());
+                }
+            }
+
+            PruneUnreachableViewModels(snapshot);
+        }
+
+        private static HashSet<TilingNode> CollectReachableNodes(IReadOnlyCollection<TilingNode> snapshot)
+        {
+            var reachable = new HashSet<TilingNode>();
+            void Visit(TilingNode node)
+            {
+                if (!reachable.Add(node))
+                {
+                    return;
+                }
+
+                if (node is PanelNode panel)
+                {
+                    foreach (var child in panel.Children)
+                    {
+                        Visit(child);
+                    }
+                }
+            }
+
+            foreach (var node in snapshot)
+            {
+                Visit(node);
+            }
+
+            return reachable;
+        }
+
+        private void PruneUnreachableViewModels(IReadOnlyCollection<TilingNode> snapshot)
+        {
+            var reachable = CollectReachableNodes(snapshot);
+            foreach (var removedNode in m_nodeViewModels.Keys.Where(node => !reachable.Contains(node)).ToList())
+            {
+                DisposeViewModel(removedNode);
+            }
+        }
+
+        private void DisposeViewModel(TilingNode removedNode)
+        {
+            if (!m_nodeViewModels.TryGetValue(removedNode, out var vm))
+            {
+                return;
+            }
+
+            m_nodeViewModels.Remove(removedNode);
+            switch (vm)
+            {
+                case TilingPanelViewModel panelViewModel:
+                    m_viewModel.PanelElements.Remove(panelViewModel);
+                    break;
+                case TilingWindowViewModel windowViewModel:
+                    m_viewModel.WindowElements.Remove(windowViewModel);
+                    break;
+                default:
+                    vm.Dispose();
+                    return;
+            }
+
+            foreach (var panelViewModel in m_viewModel.PanelElements)
+            {
+                for (var i = panelViewModel.ChildNodes.Count - 1; i >= 0; i--)
+                {
+                    if (panelViewModel.ChildNodes[i].Node == removedNode)
+                    {
+                        panelViewModel.ChildNodes.RemoveAt(i);
+                    }
+                }
+            }
+
+            vm.Dispose();
         }
 
         private TilingNodeViewModel? GetViewModel(TilingNode node)
@@ -400,42 +471,50 @@ namespace FancyWM
 
             vm.IsHeaderVisible = !IsObscured(node, focusedPath);
 
-            if (HaveChildrenChanged(vm, node))
+            SyncChildNodes(vm, node, focusedPath);
+        }
+
+        private void SyncChildNodes(TilingPanelViewModel vm, PanelNode node, IEnumerable<TilingNode> focusedPath)
+        {
+            foreach (var child in node.Children)
             {
-                vm.ChildNodes.Clear();
-                foreach (var child in node.Children)
+                EnsureViewModel(child, focusedPath);
+            }
+
+            vm.ChildNodes.Clear();
+            foreach (var child in node.Children)
+            {
+                if (GetViewModel(child) is TilingNodeViewModel childViewModel)
                 {
-                    var childViewModel = GetViewModel(child);
-                    if (childViewModel == null)
-                    {
-                        continue;
-                    }
                     vm.ChildNodes.Add(childViewModel);
                 }
             }
         }
 
-        private bool HaveChildrenChanged(TilingPanelViewModel vm, PanelNode node)
+        private TilingNodeViewModel? EnsureViewModel(TilingNode node, IEnumerable<TilingNode> focusedPath)
         {
-            if (vm.ChildNodes.Count != node.Children.Count)
+            if (GetViewModel(node) is TilingNodeViewModel existing)
             {
-                return true;
+                return existing;
             }
-            int i = 0;
-            foreach (var child in node.Children)
+
+            var vm = CreateViewModel(node, focusedPath);
+            if (vm == null)
             {
-                var childViewModel = GetViewModel(child);
-                if (childViewModel == null)
-                {
-                    continue;
-                }
-                if (childViewModel != vm.ChildNodes[i])
-                {
-                    return true;
-                }
-                i++;
+                return null;
             }
-            return false;
+
+            switch (vm)
+            {
+                case TilingPanelViewModel panelViewModel when !m_viewModel.PanelElements.Contains(panelViewModel):
+                    m_viewModel.PanelElements.Add(panelViewModel);
+                    break;
+                case TilingWindowViewModel windowViewModel when !m_viewModel.WindowElements.Contains(windowViewModel):
+                    m_viewModel.WindowElements.Add(windowViewModel);
+                    break;
+            }
+
+            return vm;
         }
 
         private static bool IsObscured(PanelNode node, IEnumerable<TilingNode> focusedPath)
@@ -466,6 +545,11 @@ namespace FancyWM
         private void OnOverlayPanelItemCloseAction(TilingNodeViewModel viewModel)
         {
             TilingNodeCloseRequested?.Invoke(this, viewModel.Node!);
+        }
+
+        private void OnStackTabReorderRequested(object sender, StackTabReorderRoutedEventArgs e)
+        {
+            StackTabReorderRequested?.Invoke(this, e);
         }
 
         private void OnDragStarted(object sender, RoutedEventArgs e)
@@ -522,6 +606,7 @@ namespace FancyWM
             {
                 Draggable.RemoveDragStartedHandler(m_overlay.Content, OnDragStarted);
                 Draggable.RemoveDragCompletedHandler(m_overlay.Content, OnDragCompleted);
+                TabBar.RemoveTabReorderRequestedHandler(m_overlay.Content, OnStackTabReorderRequested);
             }
             m_overlay.Close();
             m_viewModel.Dispose();
@@ -531,6 +616,7 @@ namespace FancyWM
 
             TilingPanelMoveRequested = null;
             TilingNodeFocusRequested = null;
+            StackTabReorderRequested = null;
             TilingNodeCloseRequested = null;
             TilingNodePullUpRequested = null;
 

@@ -45,6 +45,22 @@ namespace FancyWM.Utilities
         }
     }
 
+    internal class ByProcessInstanceMatcher(string entry) : IWindowMatcher
+    {
+        public string Entry { get; } = entry;
+
+        public bool Matches(IWindow window)
+        {
+            if (!ProcessInstanceRule.TryParse(Entry, out var processName, out var processId))
+            {
+                return false;
+            }
+
+            return window.GetCachedProcessId() == processId
+                && MatchHelpers.IsMatch(window.GetCachedProcessName(), processName);
+        }
+    }
+
     internal class ByClassNameMatcher(string className) : IWindowMatcher
     {
         public string ClassName { get; } = className;

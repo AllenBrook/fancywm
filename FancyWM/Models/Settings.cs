@@ -18,6 +18,7 @@ namespace FancyWM.Models
         bool AutoCollapsePanels { get; }
         bool DelayReposition { get; }
         bool AutoFloatNewWindows { get; }
+        bool StackAppendRestoredTabsToEnd { get; }
     }
 
     [AttributeUsage(AttributeTargets.Field)]
@@ -38,7 +39,7 @@ namespace FancyWM.Models
 
         public bool ActivateOnCapsLock { get; init; } = false;
 
-        public bool ShowStartupWindow { get; init; } = true;
+        public bool ShowStartupWindow { get; init; } = false;
 
         public bool NotifyVirtualDesktopServiceIncompatibility { get; init; } = true;
 
@@ -49,7 +50,9 @@ namespace FancyWM.Models
         public int AutoSplitCount { get; init; } = 2;
 
         public bool DelayReposition { get; init; } = true;
-        public bool AutoFloatNewWindows { get; init; } = false;
+        public bool AutoFloatNewWindows { get; init; } = true;
+
+        public bool StackAppendRestoredTabsToEnd { get; init; } = true;
 
         public bool AnimateWindowMovement { get; init; } = true;
 
@@ -57,9 +60,9 @@ namespace FancyWM.Models
 
         public bool ModifierMoveWindowAutoFocus { get; init; } = false;
 
-        public int WindowPadding { get; init; } = 4;
+        public int WindowPadding { get; init; } = 0;
 
-        public int PanelHeight { get; init; } = 18;
+        public int PanelHeight { get; init; } = 22;
 
         public int PanelFontSize { get; init; } = 12;
 
@@ -75,16 +78,11 @@ namespace FancyWM.Models
         [JsonConverter(typeof(Converters.KeybindingConverter))]
         public KeybindingDictionary Keybindings { get; init; } = [];
 
-        public List<string> ProcessIgnoreList { get; init; } =
-        [
-            "Taskmgr"
-        ];
+        public List<string> ProcessIncludeList { get; init; } = [];
 
-        public List<string> ClassIgnoreList { get; init; } =
-        [
-            "OperationStatusWindow",
-            "RAIL_WINDOW",
-        ];
+        public List<string> ProcessInstanceIncludeList { get; init; } = [];
+
+        public List<string> ClassIncludeList { get; init; } = [];
 
         public bool RemindToRateReview { get; init; } = true;
 
@@ -95,5 +93,7 @@ namespace FancyWM.Models
         public bool SoundOnFailure { get; init; } = true;
 
         public bool CheckForUpdates { get; init; } = true;
+
+        public string UiLanguage { get; init; } = "en";
     }
 }

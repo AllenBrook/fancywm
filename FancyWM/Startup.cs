@@ -100,14 +100,11 @@ Type 'FancyWM --help' from anywhere after installation.
 
         private static int AppMain(string[] args)
         {
-            // Set the working path
-            string roamingPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string fullPath = $"{roamingPath}\\FancyWM";
-            if (!Directory.Exists(fullPath))
-            {
-                Directory.CreateDirectory(fullPath);
-            }
-            Directory.SetCurrentDirectory(fullPath);
+            // Keep config, themes, and logs next to the executable (portable deployment).
+            var appDir = Path.GetFullPath(AppContext.BaseDirectory);
+            Directory.SetCurrentDirectory(appDir);
+
+            LocalizationService.ApplyFromSettingsFile(Path.GetFullPath("settings.json"));
 
             if (File.Exists("administrator-mode") && !IsAdministrator())
             {
@@ -234,22 +231,47 @@ Type 'FancyWM --help' from anywhere after installation.
             }
         }
 
+        internal static void LaunchRestartHelper()
+        {
+            var appDir = Path.GetFullPath(AppContext.BaseDirectory);
+            var restartBat = Path.Combine(appDir, "RestartFancyWM.bat");
+            var pid = Process.GetCurrentProcess().Id;
+
+            if (File.Exists(restartBat))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"\"{restartBat}\" {pid}\"",
+                    WorkingDirectory = appDir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+                return;
+            }
+
+            var startupCommand = IsPackaged
+                ? "fancywm"
+                : Environment.ProcessPath;
+            if (startupCommand == null)
+            {
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c timeout /t 2 /nobreak >nul && \"{startupCommand}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+        }
+
         private static void OnProgramExit()
         {
             if (Application.Current is App app && app.RestartOnClose)
             {
-                var startupCommand = IsPackaged ? $"fancywm" : Assembly.GetEntryAssembly()?.Location.Replace(".dll", ".exe");
-                if (startupCommand == null)
-                {
-                    return;
-                }
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c timeout 1 && taskkill /f /im fancywm.exe && timeout 1 && {startupCommand}",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
+                LaunchRestartHelper();
             }
         }
 

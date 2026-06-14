@@ -106,7 +106,7 @@ namespace FancyWM.Utilities
 
                 if (e.Handled)
                 {
-                    return new(PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam) | 1);
+                    return new LRESULT(1);
                 }
             }
 
