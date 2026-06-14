@@ -1,7 +1,0 @@
-统一为单仓库：移除 ModernWpf/winman/winman-windows 子模块
-
-- 删除根目录 .gitmodules 及三目录下的 .git 指针文件、.git/modules 子模块元数据
-- 删除 winman、winman-windows 内嵌套的 docfx .gitmodules（docfx 模板未检出，仅移除引用）
-- 将 ModernWpf、winman、winman-windows 源码作为普通目录纳入 fancywm 跟踪
-- README 构建说明改为普通 clone，不再要求 --recursive
-- CI（dotnet-desktop、microsoft-store）checkout 移除 submodules: true
