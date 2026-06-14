@@ -1,5 +1,4 @@
-构建后同步输出到 last release 目录
+构建同步目录由 last release 改为 latest
 
-- 新增 AutoBuild_SyncLastRelease.bat：将本次时间戳目录内容镜像到 Release\*\last release
-- AutoBuild_Framework.bat / AutoBuild_SelfContained.bat 构建成功后自动调用同步
-- AutoBuildAndRun.bat 改为从 Release\Framework\last release 启动程序
+- AutoBuild_SyncLastRelease.bat 输出到 Release\*\latest
+- AutoBuild_Framework / SelfContained / AndRun 脚本路径与提示同步更新

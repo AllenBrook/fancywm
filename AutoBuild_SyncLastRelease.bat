@@ -19,17 +19,17 @@ if not exist "%SOURCE_DIR%\FancyWM-GUI.exe" (
     exit /b 1
 )
 
-set "LAST_RELEASE_DIR=%RELEASE_ROOT%\last release"
+set "LATEST_DIR=%RELEASE_ROOT%\latest"
 
-if not exist "%LAST_RELEASE_DIR%" mkdir "%LAST_RELEASE_DIR%"
+if not exist "%LATEST_DIR%" mkdir "%LATEST_DIR%"
 
-echo Syncing last release...
+echo Syncing latest...
 echo   From: %SOURCE_DIR%
-echo   To  : %LAST_RELEASE_DIR%
+echo   To  : %LATEST_DIR%
 
-robocopy "%SOURCE_DIR%" "%LAST_RELEASE_DIR%" /MIR /NFL /NDL /NJH /NJS /NC /NS >nul
+robocopy "%SOURCE_DIR%" "%LATEST_DIR%" /MIR /NFL /NDL /NJH /NJS /NC /NS >nul
 if errorlevel 8 (
-    echo [ERROR] Failed to sync last release folder.
+    echo [ERROR] Failed to sync latest folder.
     exit /b 1
 )
 

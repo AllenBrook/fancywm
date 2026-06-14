@@ -16,7 +16,7 @@ if errorlevel 1 (
 )
 
 set "RELEASE_ROOT=%~dp0Release\Framework"
-set "OUTPUT_DIR=%RELEASE_ROOT%\last release"
+set "OUTPUT_DIR=%RELEASE_ROOT%\latest"
 
 if not exist "%OUTPUT_DIR%\FancyWM-GUI.exe" (
     echo Executable not found: %OUTPUT_DIR%\FancyWM-GUI.exe

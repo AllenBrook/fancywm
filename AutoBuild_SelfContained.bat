@@ -49,7 +49,7 @@ if not exist "%OUTPUT_DIR%\FancyWM-GUI.exe" (
     goto :error
 )
 
-echo [4/5] Syncing last release...
+echo [4/5] Syncing latest...
 call "%~dp0AutoBuild_SyncLastRelease.bat" "%OUTPUT_DIR%" "%RELEASE_ROOT%"
 if errorlevel 1 goto :error
 
@@ -58,7 +58,7 @@ echo.
 echo ========================================
 echo Build succeeded!
 echo Output: %OUTPUT_DIR%
-echo Latest : %RELEASE_ROOT%\last release
+echo Latest : %RELEASE_ROOT%\latest
 echo Copy this entire folder to another PC - no .NET runtime needed.
 echo Config (settings.json, themes, logs) is stored in this folder.
 echo ========================================
