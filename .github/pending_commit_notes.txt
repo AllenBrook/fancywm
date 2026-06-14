@@ -1,0 +1,5 @@
+修复 monorepo 转换后 Nerdbank.GitVersioning 导致编译失败
+
+- Directory.Build.props 设置 GitVersionBaseDirectory 为仓库根目录
+- 避免 NBGV 遍历历史时解析 winman/winman-windows 等旧子模块 gitlink（对象不在主仓）
+- AutoBuildAndRun.bat 已验证可成功编译并启动 FancyWM-GUI.exe
