@@ -1,4 +1,0 @@
-增量更新输出目录由 OnlyUpdate 改为 latestmin
-
-- AutoBuild_SyncOnlyUpdate.bat 输出到 Release\*\latestmin
-- AutoBuild_Framework / SelfContained / AutoBuild.bat 提示同步更新
