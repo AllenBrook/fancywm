@@ -415,38 +415,26 @@ namespace FancyWM
             {
                 if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window) && ShouldAutoTile(window))
                 {
-                    if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
+                    using (m_backendLock.EnterScope())
                     {
-                        using (m_floatingSetLock.EnterScope())
-                        {
-                            m_floatingSet.Add(window);
-                        }
-                        continue;
-                    }
-                }
-
-                using (m_backendLock.EnterScope())
-                {
-                    try
-                    {
-                        if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window) && ShouldAutoTile(window))
+                        try
                         {
                             m_logger.Debug("Discovered window {Window}", window.DebugString());
-                            if (TryRegisterAutoTiledWindowCore(window, out _))
+                            if (TryRegisterAutoTiledWindow(window, out _))
                             {
                                 anyChanges = true;
                             }
                         }
-                    }
-                    catch (NoValidPlacementExistsException)
-                    {
-                        PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
-                            TilingError.NoValidPlacementExists, window));
-                    }
-                    catch (InvalidWindowReferenceException)
-                    {
-                        if (m_backend.HasWindow(window))
-                            m_backend.UnregisterWindow(window);
+                        catch (NoValidPlacementExistsException)
+                        {
+                            PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
+                                TilingError.NoValidPlacementExists, window));
+                        }
+                        catch (InvalidWindowReferenceException)
+                        {
+                            if (m_backend.HasWindow(window))
+                                m_backend.UnregisterWindow(window);
+                        }
                     }
                 }
             }

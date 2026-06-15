@@ -52,8 +52,15 @@
 
 - **禁止**：在 stack 模式下，新窗口**不得自动分屏**挤占半屏。
 - **应然行为**：
-  - **同进程弹窗**（例如 stack 中某窗口全屏时弹出的对话框）→ 加入 stack，或至少不破坏全屏 stack 布局。
+  - **主窗口**（已纳入 stack 的应用主界面）→ 保持 stack。
+  - **辅助弹窗**（同进程内的查找/替换、查询对话框、`#32770`、有 Owner 的对话框、无任务栏按钮的小窗等）→ **保持浮动**，维持**原始尺寸与位置**，**不得**加入 stack（见 `AuxiliaryWindowRules`）。
   - **全新进程**（本屏尚无同进程已管理窗口）→ **保持浮动**，按**原始窗口尺寸**显示，不强制平铺。
+- **识别依据**（主窗口 vs 辅助弹窗，可组合）：
+  - 窗口类 `#32770`、扩展样式 `WS_EX_DLGMODALFRAME` / `WS_EX_TOOLWINDOW`（且无 `WS_EX_APPWINDOW`）。
+  - 同进程内存在 **Owner** 关系（`GW_OWNER`）。
+  - 无最大化/最小化按钮的 `WS_POPUP` 标题窗。
+  - 同进程内已有更显著主窗口，且本窗面积明显更小（如 Notepad++/Excel 查找框）。
+- **与白名单关系**：辅助弹窗视同**不在自动平铺白名单**，即使用户在规则里配置了进程名。
 - **全屏/最大化**：stack 内窗口最大化时会从布局树注销；须**保留根级空 `StackPanel`**，避免 stack 模式丢失；取消全屏后 stack 应恢复**整屏**而非半屏。
 
 ### 1.7 Win+Shift 激活时的提示
@@ -105,6 +112,7 @@
 | 2026-06-14 | Monorepo 转换后编译失败 | NBGV 解析历史子模块 gitlink → `GitVersionBaseDirectory` | `Directory.Build.props` |
 | 2026-06-14 | 再次 Stack 后标签全没 | `PruneUnreachableViewModels` 在 `SyncChildNodes` 之后误删 → 调整顺序 | `TilingOverlayRenderer.cs` |
 | 2026-06-14 | 托盘 Set Panel Stack 后跨屏丢 stack | 新屏注册要求同进程才进 stack → 全屏 stack 下一律进 root stack + 跨屏转移 | `TilingWorkspace.cs`、`TilingService.Private.cs` |
+| 2026-06-14 | Stack 下同进程查找/查询弹窗被纳入 stack | 同进程新窗一律进 stack → `AuxiliaryWindowRules` 识别辅助弹窗并保持浮动 | `AuxiliaryWindowRules.cs`、`TilingService*.cs` |
 | 2026-06-14 | Stack + 全屏 + 弹窗后取消全屏仅半屏 | 空 stack 被移除 + 新窗注册到根分屏 → 保留空 stack、stack 模式注册策略、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
 
 ---
@@ -118,6 +126,7 @@
 | 已采纳 | 需求与 BUG 记入本文，Agent 改代码须对照并更新 |
 | 已采纳 | 窗口自动平铺采用白名单模式（§1.1），避免临时弹窗被自动拉伸 |
 | 已采纳 | Win+Shift 激活时仅保留快捷键列表提示，移除捐赠/评价等无关 toast（§1.7） |
+| 已采纳 | 辅助弹窗（查找/查询等）不纳入 stack，保持原尺寸浮动（§1.6） |
 | 待观察 | Win+Shift+F 是否改为严格 toggle（开/关 stack）— 未单独实现 |
 
 ---
@@ -139,7 +148,8 @@
 | Win+Shift+F Stack | `TilingService.cs` → `Stack()` / `ApplyStackLayout` |
 | 标签同步 | `TilingOverlayRenderer.cs` → `SyncChildNodes`、`UpdateViewModels` |
 | 自动平铺白名单 | `TilingService.Private.cs` → `ShouldAutoTile`、`DetectChanges`；`MainWindow.xaml.cs` → `InclusionMatchers`；规则页 Include 列表 |
-| Stack 新窗注册 | `TilingService.Private.cs` → `TryRegisterAutoTiledWindow*`、`ShouldFloatNewWindowInStackMode` |
+| 辅助弹窗识别 | `FancyWM/Utilities/AuxiliaryWindowRules.cs` |
+| Stack 新窗注册 | `TilingService.Private.cs` → `TryRegisterAutoTiledWindow*`、`ShouldFloatNewWindowInStackMode`、`ShouldKeepAuxiliaryFloating` |
 | 跨屏 stack | `TilingWorkspace.cs` → `TryGetRootStackPanel`、`GetOrCreateRootStackPanel` |
 | 空 stack 保留 | `FancyWM.Layouts/.../PanelNode.cs` → `RemoveIfEmpty` |
 | Win+Shift 提示 | `MainWindow.xaml.cs` → `OnCmdSequenceBegin`、`ShowWaitingForActionToast` |

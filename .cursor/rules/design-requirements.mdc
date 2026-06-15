@@ -30,5 +30,5 @@ alwaysApply: true
 - 托盘：非最大/最小窗口 **全部 stack**
 - Stack：**右键拖标签** 排序；标签与 stack 一致
 - **Win+Shift+F**：动态 stack（当前焦点布局）
-- **双屏**：stack 状态跨屏一致；stack 模式下新窗 **不分屏**（同进程进 stack，新进程浮动原尺寸）
+- **双屏**：stack 状态跨屏一致；stack 模式下主窗口进 stack，**辅助弹窗**（查找/查询等）浮动原尺寸
 - 构建：`latest` 全量、`latestmin` 增量 DLL

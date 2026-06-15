@@ -475,6 +475,16 @@ namespace FancyWM
 
             foreach (var window in visibleWindows)
             {
+                if (AuxiliaryWindowRules.IsAuxiliaryApplicationWindow(window, visibleWindows))
+                {
+                    using (m_floatingSetLock.EnterScope())
+                    {
+                        m_floatingSet.Add(window);
+                    }
+
+                    continue;
+                }
+
                 if (!CanManage(window, ignoreFloating: true))
                 {
                     continue;
@@ -518,6 +528,11 @@ namespace FancyWM
 
                 foreach (var window in visibleWindows)
                 {
+                    if (AuxiliaryWindowRules.IsAuxiliaryApplicationWindow(window, visibleWindows))
+                    {
+                        continue;
+                    }
+
                     if (!CanManage(window, ignoreFloating: true) || m_backend.HasWindow(window))
                     {
                         continue;
@@ -1345,7 +1360,7 @@ namespace FancyWM
                     m_floatingSet.Add(e.Source);
                 }
 
-                if (ShouldAutoTile(e.Source))
+                if (ShouldAutoTile(e.Source) && !ShouldKeepAuxiliaryFloating(e.Source))
                 {
                     using (m_floatingSetLock.EnterScope())
                     {
@@ -1674,7 +1689,7 @@ namespace FancyWM
                 {
                     try
                     {
-                        if (!TryRegisterAutoTiledWindowCore(e.Source, out _))
+                        if (!TryRegisterAutoTiledWindow(e.Source, out _))
                         {
                             return;
                         }
@@ -1917,11 +1932,52 @@ namespace FancyWM
             }
         }
 
+        private bool ShouldKeepAuxiliaryFloating(IWindow window)
+        {
+            return AuxiliaryWindowRules.IsAuxiliaryApplicationWindow(window, GetSameProcessPeersOnDisplay(window));
+        }
+
+        private IReadOnlyList<IWindow> GetSameProcessPeersOnDisplay(IWindow window)
+        {
+            int processId;
+            try
+            {
+                processId = window.GetCachedProcessId();
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return [];
+            }
+
+            using (m_windowSetLock.EnterScope())
+            {
+                return m_windowSet
+                    .Where(w => w != window && IsWindowOnThisDisplay(w))
+                    .Where(w =>
+                    {
+                        try
+                        {
+                            return w.GetCachedProcessId() == processId;
+                        }
+                        catch (InvalidWindowReferenceException)
+                        {
+                            return false;
+                        }
+                    })
+                    .ToList();
+            }
+        }
+
         private bool ShouldFloatNewWindowInStackMode(IWindow window, IVirtualDesktop desktop)
         {
             if (!m_backend.IsStackModeActive(desktop))
             {
                 return false;
+            }
+
+            if (ShouldKeepAuxiliaryFloating(window))
+            {
+                return true;
             }
 
             bool isNewWindow;
@@ -2037,6 +2093,19 @@ namespace FancyWM
             node = null;
             var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
 
+            if (ShouldKeepAuxiliaryFloating(window))
+            {
+                using (m_floatingSetLock.EnterScope())
+                {
+                    m_floatingSet.Add(window);
+                }
+
+                m_logger.Information(
+                    "Window {Window} left floating (auxiliary popup, original size)",
+                    window.DebugString());
+                return false;
+            }
+
             if (ShouldFloatNewWindowInStackMode(window, desktop))
             {
                 using (m_floatingSetLock.EnterScope())
@@ -2100,6 +2169,15 @@ namespace FancyWM
                         return false;
                     }
 
+                    if (ShouldKeepAuxiliaryFloating(window))
+                    {
+                        using (m_floatingSetLock.EnterScope())
+                        {
+                            m_floatingSet.Add(window);
+                        }
+                        return false;
+                    }
+
                     if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
                     {
                         using (m_floatingSetLock.EnterScope())
@@ -2118,7 +2196,7 @@ namespace FancyWM
                                 if (!m_backend.HasWindow(window))
                                 {
                                     m_logger.Debug("Window {Window} can be managed, but is not registered with backend, registering now", window.DebugString());
-                                    if (!TryRegisterAutoTiledWindowCore(window, out _))
+                                    if (!TryRegisterAutoTiledWindow(window, out _))
                                     {
                                         return false;
                                     }
