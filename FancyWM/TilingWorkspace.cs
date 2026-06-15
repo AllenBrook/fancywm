@@ -156,8 +156,7 @@ namespace FancyWM
             var focusedNode = state.FocusedNode;
             var parent = ResolveParent(state, focusedNode);
 
-            if (TryGetRootStackPanel(state, out var rootStack)
-                && rootStack.Windows.Any(w => SharesProcessInstance(w.WindowReference, window)))
+            if (TryGetRootStackPanel(state, out var rootStack))
             {
                 parent = rootStack;
             }
@@ -169,26 +168,32 @@ namespace FancyWM
         private static bool TryGetRootStackPanel(DesktopState state, out StackPanelNode stackPanel)
         {
             stackPanel = null!;
-            if (state.DesktopTree.Root?.Children.Count == 1
-                && state.DesktopTree.Root.Children[0] is StackPanelNode stack)
-            {
-                stackPanel = stack;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool SharesProcessInstance(IWindow existing, IWindow incoming)
-        {
-            try
-            {
-                return existing.GetCachedProcessId() == incoming.GetCachedProcessId();
-            }
-            catch (InvalidWindowReferenceException)
+            if (state.DesktopTree.Root is not PanelNode root)
             {
                 return false;
             }
+
+            stackPanel = root.Children.OfType<StackPanelNode>().FirstOrDefault()!;
+            return stackPanel != null;
+        }
+
+        internal bool IsStackModeActive(IVirtualDesktop desktop)
+            => m_states.GetState(desktop)?.DesktopTree.Root is PanelNode root
+                && root.Children.OfType<StackPanelNode>().Any();
+
+        internal StackPanelNode GetOrCreateRootStackPanel(IVirtualDesktop desktop)
+        {
+            if (m_states.GetState(desktop) is not DesktopState state || state.DesktopTree.Root == null)
+                throw new InvalidOperationException("Desktop is not registered with backend!");
+
+            if (TryGetRootStackPanel(state, out var existing))
+            {
+                return existing;
+            }
+
+            var stack = new StackPanelNode();
+            state.DesktopTree.Root.Attach(stack);
+            return stack;
         }
 
         public WindowNode RegisterWindow(IWindow window, PanelNode parent, WindowNode? anchor = null)

@@ -20,7 +20,7 @@ echo SDK       : Windows %WINDOWS_SDK_VERSION%
 echo Runtime   : %RUNTIME_IDENTIFIER% (bundled, no .NET install required)
 echo.
 
-echo [1/4] Checking local dependencies...
+echo [1/6] Checking local dependencies...
 set "MISSING_DEPS=0"
 
 call :CheckDependency "winman\src\WinMan\WinMan.csproj"
@@ -34,11 +34,11 @@ if "%MISSING_DEPS%"=="1" (
     goto :error
 )
 
-echo [2/4] Restoring packages...
+echo [2/6] Restoring packages...
 dotnet restore "FancyWM.GUI\FancyWM.GUI.csproj" -r %RUNTIME_IDENTIFIER%
 if errorlevel 1 goto :error
 
-echo [3/4] Publishing self-contained Release...
+echo [3/6] Publishing self-contained Release...
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 
 dotnet publish "FancyWM.GUI\FancyWM.GUI.csproj" -c Release -r %RUNTIME_IDENTIFIER% --self-contained true -o "%OUTPUT_DIR%" --no-restore
@@ -49,16 +49,21 @@ if not exist "%OUTPUT_DIR%\FancyWM-GUI.exe" (
     goto :error
 )
 
-echo [4/5] Syncing latest...
+echo [4/6] Syncing latest...
 call "%~dp0AutoBuild_SyncLastRelease.bat" "%OUTPUT_DIR%" "%RELEASE_ROOT%"
 if errorlevel 1 goto :error
 
-echo [5/5] Done.
+echo [5/6] Syncing latestmin...
+call "%~dp0AutoBuild_SyncOnlyUpdate.bat" "%OUTPUT_DIR%" "%RELEASE_ROOT%"
+if errorlevel 1 goto :error
+
+echo [6/6] Done.
 echo.
 echo ========================================
 echo Build succeeded!
 echo Output: %OUTPUT_DIR%
-echo Latest : %RELEASE_ROOT%\latest
+echo Latest     : %RELEASE_ROOT%\latest
+echo Latestmin  : %RELEASE_ROOT%\latestmin
 echo Copy this entire folder to another PC - no .NET runtime needed.
 echo Config (settings.json, themes, logs) is stored in this folder.
 echo ========================================

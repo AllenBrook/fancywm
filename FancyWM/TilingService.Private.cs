@@ -1415,9 +1415,10 @@ namespace FancyWM
                                         return;
                                     }
 
-                                    var node = m_backend.RegisterWindow(e.Source, maxTreeWidth: m_autoSplitCount);
-                                    node.Parent!.Padding = GetPanelPaddingRect();
-                                    node.Parent!.Spacing = GetPanelSpacing();
+                                    if (!TryRegisterAutoTiledWindow(e.Source, out _))
+                                    {
+                                        return;
+                                    }
                                 }
                             }
                             catch (NoValidPlacementExistsException)
@@ -1449,6 +1450,10 @@ namespace FancyWM
             using (m_savedLocationsLock.EnterScope())
             {
                 m_savedLocations.Remove(e.Source);
+            }
+            lock (s_crossDisplayStackTransfersLock)
+            {
+                s_crossDisplayStackTransfers.Remove(e.Source);
             }
             using (m_ignoreRepositionSetLock.EnterScope())
             {
@@ -1710,9 +1715,10 @@ namespace FancyWM
                 {
                     try
                     {
-                        var window = m_backend.RegisterWindow(e.Source, maxTreeWidth: m_autoSplitCount);
-                        window.Parent!.Padding = GetPanelPaddingRect();
-                        window.Parent!.Spacing = GetPanelSpacing();
+                        if (!TryRegisterAutoTiledWindowCore(e.Source, out _))
+                        {
+                            return;
+                        }
                     }
                     catch (WindowAlreadyRegisteredException)
                     {
@@ -1753,6 +1759,8 @@ namespace FancyWM
                         ? childCount
                         : Math.Min(savedLocation.Index, childCount);
                     savedLocation.Parent.Attach(index, window);
+
+                    RepairRootStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop);
 
                     // Restore size
                     if (window.Parent is GridLikeNode gridNode)
@@ -1950,6 +1958,168 @@ namespace FancyWM
             }
         }
 
+        private bool ShouldFloatNewWindowInStackMode(IWindow window, IVirtualDesktop desktop)
+        {
+            if (!m_backend.IsStackModeActive(desktop))
+            {
+                return false;
+            }
+
+            bool isNewWindow;
+            using (m_newWindowSetLock.EnterScope())
+            {
+                isNewWindow = m_newWindowSet.Contains(window);
+            }
+
+            if (!isNewWindow)
+            {
+                return false;
+            }
+
+            try
+            {
+                var processId = window.GetCachedProcessId();
+
+                using (m_windowSetLock.EnterScope())
+                using (m_floatingSetLock.EnterScope())
+                using (m_savedLocationsLock.EnterScope())
+                {
+                    foreach (var other in m_windowSet)
+                    {
+                        if (other == window || !IsWindowOnThisDisplay(other))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            if (other.GetCachedProcessId() != processId)
+                            {
+                                continue;
+                            }
+                        }
+                        catch (InvalidWindowReferenceException)
+                        {
+                            continue;
+                        }
+
+                        if (m_floatingSet.Contains(other))
+                        {
+                            continue;
+                        }
+
+                        if (m_savedLocations.TryGetValue(other, out var saved)
+                            && saved.Parent is StackPanelNode)
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                var tree = m_backend.GetTree(desktop);
+                if (tree?.Root != null)
+                {
+                    var processInStack = tree.Root.Nodes.OfType<StackPanelNode>()
+                        .SelectMany(stack => stack.Windows)
+                        .Any(stackWindow =>
+                        {
+                            try
+                            {
+                                return stackWindow.WindowReference.GetCachedProcessId() == processId;
+                            }
+                            catch (InvalidWindowReferenceException)
+                            {
+                                return false;
+                            }
+                        });
+
+                    if (processInStack)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return true;
+            }
+        }
+
+        private void RepairRootStackLayout(IVirtualDesktop desktop)
+        {
+            if (!m_backend.IsStackModeActive(desktop))
+            {
+                return;
+            }
+
+            var root = m_backend.GetTree(desktop)?.Root;
+            if (root == null)
+            {
+                return;
+            }
+
+            var hasRootOrphans = root.Children.Any(child => child is not StackPanelNode);
+            if (hasRootOrphans || root.Windows.Any())
+            {
+                m_backend.StackAllWindows(desktop);
+            }
+
+            foreach (var panel in root.Nodes.OfType<PanelNode>())
+            {
+                panel.Padding = GetPanelPaddingRect();
+                panel.Spacing = GetPanelSpacing();
+            }
+        }
+
+        private bool TryRegisterAutoTiledWindow(IWindow window, out WindowNode? node, int maxTreeWidth = 100)
+        {
+            node = null;
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+
+            if (ShouldFloatNewWindowInStackMode(window, desktop))
+            {
+                using (m_floatingSetLock.EnterScope())
+                {
+                    m_floatingSet.Add(window);
+                }
+
+                m_logger.Information(
+                    "Window {Window} left floating in stack mode (new process, original size)",
+                    window.DebugString());
+                return false;
+            }
+
+            return TryRegisterAutoTiledWindowCore(window, out node, maxTreeWidth);
+        }
+
+        private bool TryRegisterAutoTiledWindowCore(IWindow window, out WindowNode? node, int maxTreeWidth = 100)
+        {
+            node = null;
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+
+            if (m_backend.IsStackModeActive(desktop))
+            {
+                var stack = m_backend.GetOrCreateRootStackPanel(desktop);
+                node = m_backend.RegisterWindow(window, stack);
+            }
+            else
+            {
+                var restoreToStack = TakeCrossDisplayStackTransfer(window);
+                node = m_backend.RegisterWindow(window, maxTreeWidth);
+                if (restoreToStack && node.Parent is not StackPanelNode)
+                {
+                    TryRestoreCrossDisplayStack(node);
+                }
+            }
+
+            node.Parent!.Padding = GetPanelPaddingRect();
+            node.Parent!.Spacing = GetPanelSpacing();
+            RepairRootStackLayout(desktop);
+            return true;
+        }
+
         private bool DetectChanges(IWindow window)
         {
             m_logger.Verbose("Dirty checking for changes with window {Window}", window.DebugString());
@@ -1962,6 +2132,15 @@ namespace FancyWM
                         return false;
                     }
 
+                    if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
+                    {
+                        using (m_floatingSetLock.EnterScope())
+                        {
+                            m_floatingSet.Add(window);
+                        }
+                        return false;
+                    }
+
                     try
                     {
                         using (m_backendLock.EnterScope())
@@ -1971,9 +2150,10 @@ namespace FancyWM
                                 if (!m_backend.HasWindow(window))
                                 {
                                     m_logger.Debug("Window {Window} can be managed, but is not registered with backend, registering now", window.DebugString());
-                                    var newNode = m_backend.RegisterWindow(window, maxTreeWidth: m_autoSplitCount);
-                                    newNode.Parent!.Padding = GetPanelPaddingRect();
-                                    newNode.Parent!.Spacing = GetPanelSpacing();
+                                    if (!TryRegisterAutoTiledWindowCore(window, out _))
+                                    {
+                                        return false;
+                                    }
                                     InvalidateLayout();
                                     return true;
                                 }
@@ -1998,6 +2178,7 @@ namespace FancyWM
                         if (m_backend.HasWindow(window))
                         {
                             m_logger.Verbose("Window {Window} can no longer be managed, but is registered with backend, unregistering now", window.DebugString());
+                            RememberCrossDisplayStackTransfer(window);
                             m_backend.UnregisterWindow(window);
 
                             InvalidateLayout();
@@ -2016,6 +2197,53 @@ namespace FancyWM
                 return false;
             }
             return false;
+        }
+
+        private void RememberCrossDisplayStackTransfer(IWindow window)
+        {
+            var node = m_backend.FindWindow(window);
+            if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+            {
+                return;
+            }
+
+            lock (s_crossDisplayStackTransfersLock)
+            {
+                s_crossDisplayStackTransfers[window] = true;
+            }
+        }
+
+        private static bool TakeCrossDisplayStackTransfer(IWindow window)
+        {
+            lock (s_crossDisplayStackTransfersLock)
+            {
+                return s_crossDisplayStackTransfers.Remove(window);
+            }
+        }
+
+        private void TryRestoreCrossDisplayStack(WindowNode node)
+        {
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+            var tree = m_backend.GetTree(desktop);
+            if (tree?.Root == null || node.Parent == null)
+            {
+                return;
+            }
+
+            var stack = tree.Root.Nodes.OfType<StackPanelNode>().FirstOrDefault();
+            if (stack != null)
+            {
+                if (node.Parent != stack)
+                {
+                    node.Parent.Detach(node);
+                    stack.Attach(node);
+                }
+                return;
+            }
+
+            m_backend.WrapInStackPanel(node);
+            node.Parent!.Padding = GetPanelPaddingRect();
+            node.Parent!.Spacing = GetPanelSpacing();
         }
 
         private void ResetLayoutCore()

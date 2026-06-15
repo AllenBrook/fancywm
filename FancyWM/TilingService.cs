@@ -182,6 +182,9 @@ namespace FancyWM
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
         private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
 
+        private static readonly Dictionary<IWindow, bool> s_crossDisplayStackTransfers = new();
+        private static readonly object s_crossDisplayStackTransfersLock = new();
+
         private readonly Dictionary<IWindow, NodeLocation> m_savedLocations = [];
         private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
 
@@ -412,6 +415,18 @@ namespace FancyWM
             bool anyChanges = false;
             foreach (var window in windows)
             {
+                if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window))
+                {
+                    if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
+                    {
+                        using (m_floatingSetLock.EnterScope())
+                        {
+                            m_floatingSet.Add(window);
+                        }
+                        continue;
+                    }
+                }
+
                 using (m_backendLock.EnterScope())
                 {
                     try
@@ -419,11 +434,10 @@ namespace FancyWM
                         if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window))
                         {
                             m_logger.Debug("Discovered window {Window}", window.DebugString());
-                            var newNode = m_backend.RegisterWindow(window, maxTreeWidth: m_autoSplitCount);
-                            newNode.Parent!.Padding = GetPanelPaddingRect();
-                            newNode.Parent!.Spacing = GetPanelSpacing();
-                            InvalidateLayout();
-                            anyChanges = true;
+                            if (TryRegisterAutoTiledWindowCore(window, out _))
+                            {
+                                anyChanges = true;
+                            }
                         }
                     }
                     catch (NoValidPlacementExistsException)
@@ -437,6 +451,11 @@ namespace FancyWM
                             m_backend.UnregisterWindow(window);
                     }
                 }
+            }
+
+            if (anyChanges)
+            {
+                InvalidateLayout();
             }
 
             return anyChanges;

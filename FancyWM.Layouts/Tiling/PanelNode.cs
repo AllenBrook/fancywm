@@ -123,6 +123,12 @@ namespace FancyWM.Layouts.Tiling
         {
             if (Children.Count == 0 && Parent != null)
             {
+                // Keep an empty root-level stack panel so stack mode survives maximize/unregister.
+                if (this is StackPanelNode && Parent.Parent == null)
+                {
+                    return;
+                }
+
                 var parent = Parent;
                 Remove();
                 if (parent.Children.Count <= 1)
