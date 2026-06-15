@@ -1,5 +1,0 @@
-构建输出路径去掉 Release\Framework 层级
-
-- 框架依赖构建输出改为 Release\<时间戳>、Release\latest、Release\latestmin
-- 更新 AutoBuild_Framework.bat、AutoBuildAndRun.bat、AutoBuild.bat 与需求文档 §2.2
-- SelfContained 仍使用 Release\SelfContained\...
