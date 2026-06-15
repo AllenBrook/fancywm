@@ -3,7 +3,7 @@
 本文档记录产品主需求、已发现问题与修复、以及用户建议中属于需求范畴的条目。  
 **改代码前请先对照本文；涉及需求的新 BUG、建议、行为变更须同步更新本文。**
 
-最后更新：2026-06-14
+最后更新：2026-06-15
 
 ---
 
@@ -37,8 +37,9 @@
 
 ### 1.4 Win + Shift + F 与 Stack
 
-- **用途**：对当前焦点布局**动态进入 stack**（`CreateStackPanel` / `Stack()`）。
-- **说明**：当前实现以「进入 stack」为主；全屏 stack 后 `CanStack()` 为 false，退出 stack 需 Pull up 等操作（若未来要做严格 toggle，需单独需求）。
+- **用途**：对当前焦点布局**动态切换 stack**（`CreateStackPanel` / `Stack()`）。
+- **进入 stack**：焦点不在 stack 内时，将当前焦点布局进入 stack。
+- **取消 stack**：焦点已在 stack 内时，再按 Win+Shift+F 应取消该 stack；单窗口回到父面板，多窗口转为普通 split 布局。
 
 ### 1.5 双显示器行为一致
 
@@ -116,6 +117,7 @@
 | 2026-06-14 | 双屏切换激活后 stack 标签变少 | Refresh 时白名单策略把已 stack 窗标为 floating，下次 DetectChanges 误注销 → 已注册窗不因 floating 注销；Refresh 仅处理本屏 | `TilingService*.cs`、`TilingOverlayRenderer.cs` |
 | 2026-06-14 | Stack 下同进程查找/查询弹窗被纳入 stack | 同进程新窗一律进 stack → `AuxiliaryWindowRules` 识别辅助弹窗并保持浮动 | `AuxiliaryWindowRules.cs`、`TilingService*.cs` |
 | 2026-06-14 | Stack + 全屏 + 弹窗后取消全屏仅半屏 | 空 stack 被移除 + 新窗注册到根分屏 → 保留空 stack、stack 模式注册策略、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
+| 2026-06-15 | Win+Shift+F 进入 stack 后无法取消 stack | `Stack()` 仅进入 stack，`CanStack()` 在已 stack 时返回 false → 焦点在 stack 内时改为拆回普通布局 | `TilingService*.cs` |
 
 ---
 

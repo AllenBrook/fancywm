@@ -442,6 +442,47 @@ namespace FancyWM
             InvalidateLayout();
         }
 
+        private void UnstackLayout(StackPanelNode stack, TilingNode focusedNode)
+        {
+            var parent = stack.Parent;
+            if (parent == null)
+                throw new TilingFailedException(TilingError.InvalidTarget);
+
+            var children = stack.Children.ToList();
+            if (children.Count == 0)
+                throw new TilingFailedException(TilingError.MissingTarget);
+
+            var index = parent.IndexOf(stack);
+            if (children.Count == 1)
+            {
+                var child = children[0];
+                stack.Detach(child);
+                parent.Attach(index, child);
+                parent.Detach(stack);
+            }
+            else
+            {
+                var replacement = new SplitPanelNode
+                {
+                    Orientation = PanelOrientation.Horizontal,
+                    Padding = GetPanelPaddingRect(),
+                    Spacing = GetPanelSpacing(),
+                };
+
+                parent.Attach(index, replacement);
+                foreach (var child in children)
+                {
+                    stack.Detach(child);
+                    replacement.Attach(child);
+                }
+                parent.Detach(stack);
+            }
+
+            parent.Cleanup(collapse: m_backend.AutoCollapse);
+            m_backend.SetFocus(focusedNode);
+            InvalidateLayout();
+        }
+
         private void SetPanelStackCore()
         {
             m_logger.Information("Setting panel stack for visible windows on display {Display}", m_display);
@@ -1476,7 +1517,7 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            if (m_delayReposition && m_currentInteraction == UserInteraction.Moving)
+            if (m_delayReposition && m_currentInteraction == UserInteraction.Moving && IsWindowOnThisDisplay(e.Source))
             {
                 try
                 {
@@ -1497,7 +1538,11 @@ namespace FancyWM
             {
                 if (IsWindowOnThisDisplay(e.Source))
                 {
-                    DetectChanges(e.Source, manualRegistration: HasCrossDisplayStackTransfer(e.Source));
+                    TryAcceptCrossDisplayStackWindow(e.Source);
+                }
+                else
+                {
+                    FinalizeCrossDisplayLeave(e.Source);
                 }
             }
             catch (InvalidWindowReferenceException)
@@ -1565,6 +1610,11 @@ namespace FancyWM
             {
                 if (!m_backend.HasWindow(e.Source))
                 {
+                    if (IsWindowOnThisDisplay(e.Source))
+                    {
+                        TryAcceptCrossDisplayStackWindow(e.Source);
+                    }
+
                     return;
                 }
             }
@@ -2325,6 +2375,117 @@ namespace FancyWM
             return false;
         }
 
+        private void TryAcceptCrossDisplayStackWindow(IWindow window)
+        {
+            if (!IsWindowOnThisDisplay(window))
+            {
+                return;
+            }
+
+            bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
+
+            using (m_floatingSetLock.EnterScope())
+            {
+                m_floatingSet.Remove(window);
+            }
+
+            if (!IsRegisteredWithBackend(window))
+            {
+                DetectChanges(window, manualRegistration: crossDisplayStack);
+                return;
+            }
+
+            if (!crossDisplayStack)
+            {
+                return;
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                var node = m_backend.FindWindow(window);
+                if (node == null)
+                {
+                    return;
+                }
+
+                if (node.Parent is not StackPanelNode)
+                {
+                    TryRestoreCrossDisplayStack(node);
+                }
+
+                TakeCrossDisplayStackTransfer(window);
+                RepairRootStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop);
+            }
+
+            InvalidateLayout();
+        }
+
+        private void FinalizeCrossDisplayLeave(IWindow window)
+        {
+            if (IsWindowOnThisDisplay(window))
+            {
+                return;
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                if (!m_backend.HasWindow(window))
+                {
+                    return;
+                }
+
+                RememberCrossDisplayStackTransfer(window);
+                m_backend.UnregisterWindow(window);
+            }
+
+            InvalidateLayout();
+        }
+
+        internal void FinalizeCrossDisplayLeaves()
+        {
+            List<IWindow> windows;
+            using (m_windowSetLock.EnterScope())
+            {
+                windows = [.. m_windowSet];
+            }
+
+            foreach (var window in windows)
+            {
+                try
+                {
+                    FinalizeCrossDisplayLeave(window);
+                }
+                catch (InvalidWindowReferenceException)
+                {
+                }
+            }
+        }
+
+        internal void AdmitCrossDisplayWindowsOnDisplay()
+        {
+            List<IWindow> windows;
+            using (m_windowSetLock.EnterScope())
+            {
+                windows = [.. m_windowSet];
+            }
+
+            foreach (var window in windows)
+            {
+                try
+                {
+                    if (!IsWindowOnThisDisplay(window))
+                    {
+                        continue;
+                    }
+
+                    TryAcceptCrossDisplayStackWindow(window);
+                }
+                catch (InvalidWindowReferenceException)
+                {
+                }
+            }
+        }
+
         private static bool HasCrossDisplayStackTransfer(IWindow window)
         {
             lock (s_crossDisplayStackTransfersLock)
@@ -2345,6 +2506,13 @@ namespace FancyWM
             {
                 s_crossDisplayStackTransfers[window] = true;
             }
+
+            CrossDisplayStackTransferReady?.Invoke(window);
+        }
+
+        internal void AdmitCrossDisplayStackWindow(IWindow window)
+        {
+            TryAcceptCrossDisplayStackWindow(window);
         }
 
         private static bool TakeCrossDisplayStackTransfer(IWindow window)

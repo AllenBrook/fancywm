@@ -183,6 +183,11 @@ namespace FancyWM
         private static readonly Dictionary<IWindow, bool> s_crossDisplayStackTransfers = new();
         private static readonly object s_crossDisplayStackTransfersLock = new();
 
+        /// <summary>
+        /// Raised after a window is marked for cross-display stack handoff so the target display can admit it.
+        /// </summary>
+        internal static Action<IWindow>? CrossDisplayStackTransferReady;
+
         private readonly Dictionary<IWindow, NodeLocation> m_savedLocations = [];
         private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
 
@@ -551,16 +556,21 @@ namespace FancyWM
 
         public bool CanStack()
         {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            if (focusedNode != null)
+            {
+                if (focusedNode.PathToRoot.OfType<StackPanelNode>().Any())
+                    return true;
+
+                return CanStack(focusedNode);
+            }
+
             using (m_backendLock.EnterScope())
             {
                 var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
                 if (m_backend.IsFullyStacked(desktop))
                     return false;
             }
-
-            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
-            if (focusedNode != null)
-                return CanStack(focusedNode);
 
             var window = m_workspace.FocusedWindow;
             return window != null && CanManage(window, ignoreFloating: true);
@@ -574,7 +584,15 @@ namespace FancyWM
 
             using (m_backendLock.EnterScope())
             {
-                ApplyStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop, focusedNode);
+                var stack = focusedNode.PathToRoot.OfType<StackPanelNode>().FirstOrDefault();
+                if (stack != null)
+                {
+                    UnstackLayout(stack, focusedNode);
+                }
+                else
+                {
+                    ApplyStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop, focusedNode);
+                }
             }
         }
 

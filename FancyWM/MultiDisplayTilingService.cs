@@ -104,11 +104,28 @@ namespace FancyWM
             Workspace.FocusedWindowChanged += OnFocusedWindowChanged;
             m_subscriptions.Add(Disposable.Create(() => Workspace.FocusedWindowChanged -= OnFocusedWindowChanged));
 
+            TilingService.CrossDisplayStackTransferReady = OnCrossDisplayStackTransferReady;
+            m_subscriptions.Add(Disposable.Create(() =>
+            {
+                if (ReferenceEquals(TilingService.CrossDisplayStackTransferReady, (Action<IWindow>)OnCrossDisplayStackTransferReady))
+                {
+                    TilingService.CrossDisplayStackTransferReady = null;
+                }
+            }));
+
             var focusLocationObservable = m_focusedWindowLocationChanges
                 .Throttle(TimeSpan.FromMilliseconds(100))
                 .Do(async _ => await Dispatcher.InvokeAsync(() =>
                 {
                     UpdateActiveDisplay(reason: "the focused window was moved");
+
+                    lock (m_syncRoot)
+                    {
+                        if (m_tilingServices.TryGetValue(m_activeDisplay, out var activeTiling))
+                        {
+                            activeTiling.AdmitCrossDisplayWindowsOnDisplay();
+                        }
+                    }
                 }));
             m_subscriptions.Add(focusLocationObservable.Subscribe());
         }
@@ -174,6 +191,36 @@ namespace FancyWM
             m_focusedWindowLocationChanges.OnNext(Unit.Default);
         }
 
+        private void OnCrossDisplayStackTransferReady(IWindow window)
+        {
+            _ = Dispatcher.InvokeAsync(() => AdmitCrossDisplayStackWindowOnOwningDisplay(window));
+        }
+
+        private void AdmitCrossDisplayStackWindowOnOwningDisplay(IWindow window)
+        {
+            try
+            {
+                var center = window.Position.Center;
+                var display = Workspace.DisplayManager.Displays
+                    .FirstOrDefault(d => d.Bounds.Contains(center));
+                if (display == null)
+                {
+                    return;
+                }
+
+                lock (m_syncRoot)
+                {
+                    if (m_tilingServices.TryGetValue(display, out var tiling))
+                    {
+                        tiling.AdmitCrossDisplayStackWindow(window);
+                    }
+                }
+            }
+            catch (InvalidWindowReferenceException)
+            {
+            }
+        }
+
         private void OnFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
         {
             if (e.OldFocusedWindow != null)
@@ -189,6 +236,22 @@ namespace FancyWM
             _ = Dispatcher.InvokeAsync(() =>
             {
                 UpdateActiveDisplay($"the focused window has changed to {e.NewFocusedWindow.DebugString()}");
+
+                lock (m_syncRoot)
+                {
+                    foreach (var kvp in m_tilingServices)
+                    {
+                        if (!kvp.Key.Equals(m_activeDisplay))
+                        {
+                            kvp.Value.FinalizeCrossDisplayLeaves();
+                        }
+                    }
+
+                    if (m_tilingServices.TryGetValue(m_activeDisplay, out var activeTiling))
+                    {
+                        activeTiling.AdmitCrossDisplayWindowsOnDisplay();
+                    }
+                }
             });
         }
 
@@ -202,6 +265,7 @@ namespace FancyWM
                     m_logger.Information($"Active display changed from {m_activeDisplay} to {newActiveDisplay}");
                     if (m_tilingServices.TryGetValue(m_activeDisplay, out var oldTiling))
                     {
+                        oldTiling.FinalizeCrossDisplayLeaves();
                         oldTiling.AutoRegisterWindows = true;
                     }
                     else
@@ -212,6 +276,7 @@ namespace FancyWM
                     if (m_tilingServices.TryGetValue(m_activeDisplay, out var newTiling))
                     {
                         newTiling.AutoRegisterWindows = true;
+                        newTiling.AdmitCrossDisplayWindowsOnDisplay();
                         newTiling.Refresh();
                     }
                     else
