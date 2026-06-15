@@ -78,10 +78,10 @@
 
 | 路径 | 含义 |
 |------|------|
-| `Release\Framework\<时间戳>\` | Framework 依赖完整构建 |
-| `Release\Framework\latest\` | 最新完整构建（镜像） |
-| `Release\Framework\latestmin\` | **增量更新包**（见下表） |
-| `Release\SelfContained\...` | 自包含构建，同样有 `latest` / `latestmin` |
+| `Release\<时间戳>\` | 框架依赖完整构建（`AutoBuild_Framework.bat`） |
+| `Release\latest\` | 最新完整构建（镜像） |
+| `Release\latestmin\` | **增量更新包**（见下表） |
+| `Release\SelfContained\...` | 自包含构建（`AutoBuild_SelfContained.bat`），同样有 `latest` / `latestmin` |
 
 **`latestmin` 内容**（覆盖到目标机已有完整安装目录）：
 

@@ -8,7 +8,7 @@ set "RUNTIME_IDENTIFIER=win-x64"
 
 for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd_HHmmss_fff'"`) do set "BUILD_TIMESTAMP=%%T"
 
-set "RELEASE_ROOT=%~dp0Release\Framework"
+set "RELEASE_ROOT=%~dp0Release"
 set "OUTPUT_DIR=%RELEASE_ROOT%\%BUILD_TIMESTAMP%"
 
 echo ========================================

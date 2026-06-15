@@ -15,7 +15,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "RELEASE_ROOT=%~dp0Release\Framework"
+set "RELEASE_ROOT=%~dp0Release"
 set "OUTPUT_DIR=%RELEASE_ROOT%\latest"
 
 if not exist "%OUTPUT_DIR%\FancyWM-GUI.exe" (
