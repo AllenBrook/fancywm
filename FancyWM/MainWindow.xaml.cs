@@ -55,7 +55,6 @@ namespace FancyWM
         private readonly TimeSpan ToastDurationCommandSequenceWithContextHints = TimeSpan.FromMilliseconds(9000);
         private readonly TimeSpan ToastDurationLong = TimeSpan.FromMilliseconds(3000);
         private readonly TimeSpan ToastDurationShort = TimeSpan.FromMilliseconds(1000);
-        private readonly TimeSpan RateReviewDelay = TimeSpan.FromMinutes(30);
         private readonly double ResizeDisplayPercentage = 1.0 / 12.0;
 
         private readonly ILogger m_logger;
@@ -76,12 +75,9 @@ namespace FancyWM
         private KeybindingDictionary m_keybindings;
         private readonly IntPtr m_hwnd;
         private readonly AnimationThread m_animationThread;
-        private bool m_enableRateReviewRequests;
-        private DateTime m_reviewTooltipShown;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
         private bool m_checkForUpdates;
-        private readonly Stopwatch m_stopwatch;
         private readonly IMicaProvider m_micaProvider;
         private readonly ModifierWindowMover m_mvm;
         private long m_cmdSequenceId = 0;
@@ -121,7 +117,6 @@ namespace FancyWM
 
             var settings = App.Current.AppState.Settings
                 .Do(x => m_keybindings = x.Keybindings)
-                .Do(x => m_enableRateReviewRequests = x.RemindToRateReview)
                 .Do(x => m_showContextHints = x.ShowContextHints)
                 .Do(x => m_soundOnFailure = x.SoundOnFailure)
                 .Do(x => m_checkForUpdates = x.CheckForUpdates)
@@ -232,7 +227,6 @@ namespace FancyWM
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
             m_notifyIcon.TrayRightMouseDown += OnNotifyIconRightMouseDown;
             m_notifyIcon.Visibility = Visibility.Visible;
-            m_notifyIcon.TrayBalloonTipClicked += OnBalloonTipClicked;
 
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
@@ -243,9 +237,6 @@ namespace FancyWM
             setPanelStackMenuItem.Click += OnSetPanelStackClick;
             m_contextMenu.Items.Insert(1, setPanelStackMenuItem);
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
-
-            m_stopwatch = new Stopwatch();
-            m_stopwatch.Start();
 
             m_dispatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
@@ -657,7 +648,7 @@ namespace FancyWM
                 }
 
                 PlayBeepSound();
-                await ShowToastAsync(Strings.Messages_UnrecognizedKeybinding, $"{Strings.Messages_NothingIsAssignedTo} [{keys.ToPrettyString()}]!", ToastDurationLong);
+                return;
             }
             catch (TilingFailedException e)
             {
@@ -1026,18 +1017,6 @@ namespace FancyWM
             }
         }
 
-        private async void OnBalloonTipClicked(object? sender, RoutedEventArgs e)
-        {
-            if (DateTime.UtcNow - m_reviewTooltipShown < TimeSpan.FromSeconds(10))
-            {
-                new AboutWindow().Show();
-                await App.Current.AppState.Settings.SaveAsync(x =>
-                {
-                    return x with { RemindToRateReview = false };
-                });
-            }
-        }
-
         private static KeyCode RemapSideAgnosticKey(KeyCode key)
         {
             return key switch
@@ -1082,12 +1061,6 @@ namespace FancyWM
             long currentId = ++m_cmdSequenceId;
 
             m_logger.Debug($"Command sequence {currentId} started");
-            if (m_stopwatch.Elapsed >= RateReviewDelay && m_enableRateReviewRequests)
-            {
-                m_enableRateReviewRequests = false;
-                m_reviewTooltipShown = DateTime.UtcNow;
-                m_notifyIcon.ShowBalloonTip(Strings.Messages_EnjoyingFancyWM, Strings.Messages_AskForReview, BalloonIcon.None);
-            }
 
             var cts = new CancellationTokenSource(m_showContextHints ? ToastDurationCommandSequenceWithContextHints : ToastDurationCommandSequence);
             var keyListener = new LowLevelKeyPatternListener(m_llkbdHook);
@@ -1165,41 +1138,20 @@ namespace FancyWM
 
         private async Task ShowWaitingForActionToast(bool showContextHints, CancellationToken cancellationToken)
         {
-            var container = new StackPanel
+            if (!showContextHints)
             {
-                Orientation = Orientation.Vertical,
-            };
-            if (showContextHints)
-            {
-                var extraContent = new ScrollViewer
+                try
                 {
-                    Visibility = Visibility.Collapsed,
-                    Content = GetContextHintsExtraContent(),
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
-                };
-
-                _ = Dispatcher.RunAsync(async () =>
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException)
                 {
-                    await Task.Delay(ToastDurationShort);
+                }
 
-                    extraContent.Visibility = Visibility.Visible;
-                    extraContent.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                    var extraContentHeight = extraContent.DesiredSize.Height + 32;
-                    DoubleAnimation opacityAnimation = new(0, 1, TimeSpan.FromMilliseconds(200));
-                    DoubleAnimation heightAnimation = new(0, extraContentHeight, TimeSpan.FromMilliseconds(200));
-                    extraContent.BeginAnimation(OpacityProperty, opacityAnimation);
-                    extraContent.BeginAnimation(MaxHeightProperty, heightAnimation);
-                });
-
-                container.Children.Add(extraContent);
+                return;
             }
 
-            container.Children.Add(new MessageBoxContent
-            {
-                Text = Strings.Messages_WaitingForAction,
-                HintText = Strings.Messages_PressF12ForHelp,
-            });
-            await m_toasts.ShowToastAsync(container, cancellationToken);
+            await m_toasts.ShowToastAsync(GetContextHintsExtraContent(), cancellationToken);
         }
 
 

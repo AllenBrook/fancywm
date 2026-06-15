@@ -767,48 +767,7 @@ namespace FancyWM
                 }
             }
 
-            var processName = window.GetCachedProcessName();
-            var processId = window.GetCachedProcessId();
-            var instanceKey = ProcessInstanceRule.Format(processName, processId);
-            if (!floated)
-            {
-                using (m_autoTileProcessIdsLock.EnterScope())
-                {
-                    m_autoTileProcessIds.Add(processId);
-                }
-
-                App.Current.AppState.Settings.SaveAsync(x =>
-                {
-                    if (x.ProcessInstanceIncludeList.Contains(instanceKey))
-                    {
-                        return x;
-                    }
-
-                    return x with { ProcessInstanceIncludeList = [.. x.ProcessInstanceIncludeList, instanceKey] };
-                });
-            }
-            else if (!HasOtherTiledInstances(window, processId))
-            {
-                using (m_autoTileProcessIdsLock.EnterScope())
-                {
-                    m_autoTileProcessIds.Remove(processId);
-                }
-
-                App.Current.AppState.Settings.SaveAsync(x =>
-                {
-                    if (!x.ProcessInstanceIncludeList.Contains(instanceKey))
-                    {
-                        return x;
-                    }
-
-                    return x with
-                    {
-                        ProcessInstanceIncludeList = x.ProcessInstanceIncludeList.Where(k => k != instanceKey).ToList(),
-                    };
-                });
-            }
-
-            DetectChanges(window);
+            DetectChanges(window, manualRegistration: true);
             if (floated)
             {
                 OnWindowFloated(window);
@@ -1399,7 +1358,7 @@ namespace FancyWM
                     return;
                 }
 
-                if (CanManage(e.Source) && e.Source.State == WindowState.Restored)
+                if (CanManage(e.Source) && ShouldAutoTile(e.Source) && e.Source.State == WindowState.Restored)
                 {
                     m_logger.Information("Window {Window} can be managed, registering with backend ({Display})", e.Source.DebugString(), m_display);
                     m_dispatcher.BeginInvoke(() =>
@@ -2120,7 +2079,7 @@ namespace FancyWM
             return true;
         }
 
-        private bool DetectChanges(IWindow window)
+        private bool DetectChanges(IWindow window, bool manualRegistration = false)
         {
             m_logger.Verbose("Dirty checking for changes with window {Window}", window.DebugString());
             try
@@ -2129,6 +2088,15 @@ namespace FancyWM
                 {
                     if (!AutoRegisterWindows || m_showDesktopAwaitingRestore)
                     {
+                        return false;
+                    }
+
+                    if (!manualRegistration && !ShouldAutoTile(window))
+                    {
+                        using (m_floatingSetLock.EnterScope())
+                        {
+                            m_floatingSet.Add(window);
+                        }
                         return false;
                     }
 
@@ -2595,30 +2563,9 @@ namespace FancyWM
             InvalidateLayout();
         }
 
-        private bool HasOtherTiledInstances(IWindow window, int processId)
-        {
-            using (m_windowSetLock.EnterScope())
-            using (m_floatingSetLock.EnterScope())
-            {
-                return m_windowSet.Any(w =>
-                    w != window
-                    && w.GetCachedProcessId() == processId
-                    && !m_floatingSet.Contains(w)
-                    && CanManage(w, ignoreFloating: true));
-            }
-        }
-
         private bool ShouldAutoTile(IWindow window)
         {
-            if (m_inclusionMatchers.Any(x => x.Matches(window)))
-            {
-                return true;
-            }
-
-            using (m_autoTileProcessIdsLock.EnterScope())
-            {
-                return m_autoTileProcessIds.Contains(window.GetCachedProcessId());
-            }
+            return m_inclusionMatchers.Any(x => x.Matches(window));
         }
 
         private void EnsureWindowTiled(IWindow window)
@@ -2643,7 +2590,7 @@ namespace FancyWM
             }
 
             if (shouldRegister)
-                DetectChanges(window);
+                DetectChanges(window, manualRegistration: true);
         }
 
         private TilingNode? GetFocusedTilingNode(bool ensureManaged = false)

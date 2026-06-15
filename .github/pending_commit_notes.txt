@@ -1,0 +1,10 @@
+白名单自动平铺 + Win+Shift 提示精简
+
+自动平铺（§1.1）：
+- ShouldAutoTile 仅匹配 InclusionMatchers；ToggleFloat 不隐式写入 ProcessInstanceIncludeList
+- DetectChanges / OnWindowAdded / DiscoverWindows 自动路径校验白名单
+
+Win+Shift 提示（§1.7）：
+- 移除捐赠/评价托盘 balloon（EnjoyingFancyWM / AskForReview）
+- 等待提示仅显示快捷键列表（ShowContextHints）；去掉「等待操作…」「F12 帮助」
+- 未识别快捷键不再弹 toast（保留 beep）；操作失败/异常 toast 保留

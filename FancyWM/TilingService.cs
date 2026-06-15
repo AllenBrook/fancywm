@@ -176,8 +176,6 @@ namespace FancyWM
         private readonly HashSet<IWindow> m_floatingSet = [];
         private readonly Utilities.DebugLock m_floatingSetLock = new(LockThreshold);
 
-        private readonly HashSet<int> m_autoTileProcessIds = [];
-        private readonly Utilities.DebugLock m_autoTileProcessIdsLock = new(LockThreshold);
 
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
         private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
@@ -415,7 +413,7 @@ namespace FancyWM
             bool anyChanges = false;
             foreach (var window in windows)
             {
-                if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window))
+                if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window) && ShouldAutoTile(window))
                 {
                     if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
                     {
@@ -431,7 +429,7 @@ namespace FancyWM
                 {
                     try
                     {
-                        if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window))
+                        if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window) && ShouldAutoTile(window))
                         {
                             m_logger.Debug("Discovered window {Window}", window.DebugString());
                             if (TryRegisterAutoTiledWindowCore(window, out _))
