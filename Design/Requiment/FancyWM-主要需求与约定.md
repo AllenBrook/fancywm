@@ -112,6 +112,8 @@
 | 2026-06-14 | Monorepo 转换后编译失败 | NBGV 解析历史子模块 gitlink → `GitVersionBaseDirectory` | `Directory.Build.props` |
 | 2026-06-14 | 再次 Stack 后标签全没 | `PruneUnreachableViewModels` 在 `SyncChildNodes` 之后误删 → 调整顺序 | `TilingOverlayRenderer.cs` |
 | 2026-06-14 | 托盘 Set Panel Stack 后跨屏丢 stack | 新屏注册要求同进程才进 stack → 全屏 stack 下一律进 root stack + 跨屏转移 | `TilingWorkspace.cs`、`TilingService.Private.cs` |
+| 2026-06-14 | 跨屏拖动 stack 窗口后变 float | 转移标记晚于目标屏 DetectChanges / 白名单拦截 → 拖动中提前 Remember、跨屏注册绕过 float | `TilingService.Private.cs` |
+| 2026-06-14 | 双屏切换激活后 stack 标签变少 | Refresh 时白名单策略把已 stack 窗标为 floating，下次 DetectChanges 误注销 → 已注册窗不因 floating 注销；Refresh 仅处理本屏 | `TilingService*.cs`、`TilingOverlayRenderer.cs` |
 | 2026-06-14 | Stack 下同进程查找/查询弹窗被纳入 stack | 同进程新窗一律进 stack → `AuxiliaryWindowRules` 识别辅助弹窗并保持浮动 | `AuxiliaryWindowRules.cs`、`TilingService*.cs` |
 | 2026-06-14 | Stack + 全屏 + 弹窗后取消全屏仅半屏 | 空 stack 被移除 + 新窗注册到根分屏 → 保留空 stack、stack 模式注册策略、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
 

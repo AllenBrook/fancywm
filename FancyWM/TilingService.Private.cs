@@ -1492,6 +1492,18 @@ namespace FancyWM
             }
 
             m_logger.Information("Window {Window} move ended", e.Source.DebugString());
+
+            try
+            {
+                if (IsWindowOnThisDisplay(e.Source))
+                {
+                    DetectChanges(e.Source, manualRegistration: HasCrossDisplayStackTransfer(e.Source));
+                }
+            }
+            catch (InvalidWindowReferenceException)
+            {
+            }
+
             InvalidateLayout();
             using (m_ignoreRepositionSetLock.EnterScope())
             {
@@ -1519,13 +1531,32 @@ namespace FancyWM
             }
             m_lastWindowPositionChanged = m_sw.Elapsed;
 
+            try
+            {
+                MaybeRememberCrossDisplayStackTransfer(e.Source);
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return;
+            }
+
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 if (!m_ignoreRepositionSet.Contains(e.Source))
                 {
                     // Some other event might have resulted in the movement of the window.
                     // Do not call DetectChanges under the lock, to avoid deadlock.
-                    m_dispatcher.InvokeAsync(() => DetectChanges(e.Source));
+                    m_dispatcher.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            MaybeRememberCrossDisplayStackTransfer(e.Source);
+                            DetectChanges(e.Source, manualRegistration: HasCrossDisplayStackTransfer(e.Source));
+                        }
+                        catch (InvalidWindowReferenceException)
+                        {
+                        }
+                    });
                     return;
                 }
             }
@@ -2088,12 +2119,37 @@ namespace FancyWM
             }
         }
 
+        private void MaybeRememberCrossDisplayStackTransfer(IWindow window)
+        {
+            if (IsWindowOnThisDisplay(window))
+            {
+                return;
+            }
+
+            using (m_backendLock.EnterScope())
+            {
+                if (!m_backend.HasWindow(window))
+                {
+                    return;
+                }
+
+                var node = m_backend.FindWindow(window);
+                if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+                {
+                    return;
+                }
+            }
+
+            RememberCrossDisplayStackTransfer(window);
+        }
+
         private bool TryRegisterAutoTiledWindow(IWindow window, out WindowNode? node, int maxTreeWidth = 100)
         {
             node = null;
             var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+            bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
 
-            if (ShouldKeepAuxiliaryFloating(window))
+            if (!crossDisplayStack && ShouldKeepAuxiliaryFloating(window))
             {
                 using (m_floatingSetLock.EnterScope())
                 {
@@ -2106,7 +2162,7 @@ namespace FancyWM
                 return false;
             }
 
-            if (ShouldFloatNewWindowInStackMode(window, desktop))
+            if (!crossDisplayStack && ShouldFloatNewWindowInStackMode(window, desktop))
             {
                 using (m_floatingSetLock.EnterScope())
                 {
@@ -2117,6 +2173,11 @@ namespace FancyWM
                     "Window {Window} left floating in stack mode (new process, original size)",
                     window.DebugString());
                 return false;
+            }
+
+            using (m_floatingSetLock.EnterScope())
+            {
+                m_floatingSet.Remove(window);
             }
 
             return TryRegisterAutoTiledWindowCore(window, out node, maxTreeWidth);
@@ -2148,6 +2209,14 @@ namespace FancyWM
             return true;
         }
 
+        private bool IsRegisteredWithBackend(IWindow window)
+        {
+            using (m_backendLock.EnterScope())
+            {
+                return m_backend.HasWindow(window);
+            }
+        }
+
         private bool DetectChanges(IWindow window, bool manualRegistration = false)
         {
             m_logger.Verbose("Dirty checking for changes with window {Window}", window.DebugString());
@@ -2160,25 +2229,36 @@ namespace FancyWM
                         return false;
                     }
 
-                    if (!manualRegistration && !ShouldAutoTile(window))
+                    bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
+                    bool allowManagedRegistration = manualRegistration || crossDisplayStack;
+
+                    if (!allowManagedRegistration && !ShouldAutoTile(window))
                     {
-                        using (m_floatingSetLock.EnterScope())
+                        if (!IsRegisteredWithBackend(window))
                         {
-                            m_floatingSet.Add(window);
+                            using (m_floatingSetLock.EnterScope())
+                            {
+                                m_floatingSet.Add(window);
+                            }
                         }
+
                         return false;
                     }
 
-                    if (ShouldKeepAuxiliaryFloating(window))
+                    if (!allowManagedRegistration && ShouldKeepAuxiliaryFloating(window))
                     {
-                        using (m_floatingSetLock.EnterScope())
+                        if (!IsRegisteredWithBackend(window))
                         {
-                            m_floatingSet.Add(window);
+                            using (m_floatingSetLock.EnterScope())
+                            {
+                                m_floatingSet.Add(window);
+                            }
                         }
+
                         return false;
                     }
 
-                    if (ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
+                    if (!crossDisplayStack && ShouldFloatNewWindowInStackMode(window, m_workspace.VirtualDesktopManager.CurrentDesktop))
                     {
                         using (m_floatingSetLock.EnterScope())
                         {
@@ -2221,7 +2301,7 @@ namespace FancyWM
                 {
                     using (m_backendLock.EnterScope())
                     {
-                        if (m_backend.HasWindow(window))
+                        if (m_backend.HasWindow(window) && !CanManage(window, ignoreFloating: true))
                         {
                             m_logger.Verbose("Window {Window} can no longer be managed, but is registered with backend, unregistering now", window.DebugString());
                             RememberCrossDisplayStackTransfer(window);
@@ -2243,6 +2323,14 @@ namespace FancyWM
                 return false;
             }
             return false;
+        }
+
+        private static bool HasCrossDisplayStackTransfer(IWindow window)
+        {
+            lock (s_crossDisplayStackTransfersLock)
+            {
+                return s_crossDisplayStackTransfers.ContainsKey(window);
+            }
         }
 
         private void RememberCrossDisplayStackTransfer(IWindow window)

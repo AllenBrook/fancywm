@@ -240,7 +240,15 @@ namespace FancyWM
 
         private void PruneUnreachableViewModels(IReadOnlyCollection<TilingNode> snapshot)
         {
-            var reachable = snapshot.ToHashSet();
+            var reachable = new HashSet<TilingNode>();
+            foreach (var node in snapshot)
+            {
+                foreach (var reachableNode in node.Nodes)
+                {
+                    reachable.Add(reachableNode);
+                }
+            }
+
             foreach (var removedNode in m_nodeViewModels.Keys.Where(node => !reachable.Contains(node)).ToList())
             {
                 DisposeViewModel(removedNode);

@@ -458,6 +458,11 @@ namespace FancyWM
             bool anyChanges = false;
             foreach (var window in windows)
             {
+                if (!IsWindowOnThisDisplay(window))
+                {
+                    continue;
+                }
+
                 if (DetectChanges(window))
                 {
                     anyChanges = true;
@@ -480,6 +485,11 @@ namespace FancyWM
                         continue;
                     foreach (var window in windows)
                     {
+                        if (!IsWindowOnThisDisplay(window))
+                        {
+                            continue;
+                        }
+
                         if (tree.FindNode(window) != null && !desktop.HasWindow(window))
                         {
                             movedWindows.Add(window);
