@@ -3,7 +3,7 @@
 本文档记录产品主需求、已发现问题与修复、以及用户建议中属于需求范畴的条目。  
 **改代码前请先对照本文；涉及需求的新 BUG、建议、行为变更须同步更新本文。**
 
-最后更新：2026-06-15
+最后更新：2026-06-16
 
 ---
 
@@ -27,25 +27,26 @@
 ### 1.2 托盘「Set Panel Stack」
 
 - **入口**：**仅**托盘右键菜单；无其他快捷键或入口可触发整屏 stack。
-- **行为**：对本屏每个**符合条件**的可管理窗口（按句柄逐个处理），各调用一次与 **Win+Shift+F 进入 stack 相同**的 `WrapInStackPanel`（单窗独立 stack 壳）；**不得**建根级共享 stack，**不得** `StackAllWindows`。
-- **范围**：多显示器时，各显示器分别对本屏窗口逐句柄执行（`SetPanelStack` 对每个 `TilingService` 执行）。
-- **窗口枚举**：刷新工作区后，遍历当前虚拟桌面上**任务栏可见**窗口（`GetSnapshot` / `IsTopLevelVisible`）；仅处理 **已还原**（非最小化、非最大化）且落在该显示器上的窗口；未纳入 `m_windowSet` 的窗口亦须 stack（经 `EnsureRegisteredForManualStack` 注册）。
+- **行为**：将本屏每个**符合条件**的可管理窗口，**全部并入该显示器布局树的根级 `StackPanel`**（屏幕**顶部共享 stack 标签栏**）。实现上通过 `GetOrCreateRootStackPanel` + `MergeWindowsIntoRootStack` / `MergeWindowsIntoStack`；**不得**对每个句柄单独 `WrapInStackPanel` 造「每窗/每进程独立 stack 壳」。
+- **范围**：多显示器时，各 `TilingService`（独立布局树）分别把**本屏**窗口并入**本屏**根级标签栏。
+- **窗口枚举**：刷新工作区后，遍历当前虚拟桌面上**任务栏可见**窗口（`GetSnapshot` / `IsTopLevelVisible`）；仅处理 **已还原**（非最小化、非最大化）且落在该显示器上的窗口。
 - **跳过**：最小化、最大化、辅助弹窗（§1.6）、`CanManage` 为 false 的窗口。
 
-### 1.3 Stack 模式下的标签栏
+### 1.3 Stack 模式与顶部标签栏
 
+- **共享标签栏**：每块显示器在 stack 模式下只有**一个**根级 `StackPanel` 顶栏；各主窗口以**标签页**形式同栏切换，**不是**每窗一套独立 stack 面板。
 - **右键拖动标签**：在 stack 顶栏用**右键**拖动标签，可调整 stack 内窗口顺序（`TabBar` + `StackTabReorderRequested`）。
 - **标签不得无故消失**：stack ↔ 非 stack 切换、布局刷新后，标签栏应与 stack 子节点一致（见 §3 已修复项）。
 
-### 1.4 Win + Shift + F 与 Stack
+### 1.4 Win + Shift + F / F1 与 Stack
 
-- **用途**：对**当前激活窗口**（`Workspace.FocusedWindow` 句柄）做 stack **单窗切换**（`Stack()` → `StackWindow`）。
-- **进入 stack**：焦点窗不在 stack 内时，**仅** `WrapInStackPanel(该窗节点)`。
-- **取消 stack**（再按 Win+Shift+F）：恢复**原始窗口**（浮动 + `OnWindowFloated` 原尺寸/位置），**不得**拆成 split 平铺。
-- **再次 stack**：浮动态须经 `EnsureRegisteredForManualStack` 普通平铺注册后再 `WrapInStackPanel`，勿误入根 stack 标签栏。
-- **与 1.2 的关系**：托盘 Set Panel Stack = 对本屏每个符合条件句柄**各执行一次**进入 stack（`TryEnterStackForWindow`，不 toggle）；Win+Shift+F 只作用于**当前激活**的那一个句柄。
+- **用途**：对**当前激活窗口**做 stack **单窗 toggle**（`Stack()` → `StackWindow`）；与托盘整屏 stack **共用同一根级标签栏**，不是独立 stack 壳。
+- **进入 stack**：焦点窗不在 stack 标签栏内时，**加入**本屏根级 `StackPanel`（`TryJoinRootStack` / `RegisterWindow(window, rootStack)` + merge）。
+- **取消 stack**（再按 Win+Shift+F 或 F1）：从标签栏移出该窗，恢复**原始窗口**（浮动 + `OnWindowFloated` 原尺寸/位置），**不得**拆成 split 平铺。
+- **再次 stack**：浮动态重新注册并 merge 进根级共享标签栏（`GetOrCreateRootStackPanel`）。
+- **与 1.2 的关系**：托盘 = 本屏**全部**符合条件窗口一次并入标签栏；Win+Shift+F / F1 = **仅当前焦点窗** toggle 进出标签栏。
 - **默认快捷键**：`CreateStackPanel` = Win+Shift+F；`ToggleFloatingMode`（单窗浮动）= Win+Shift+T。
-- **F1 直接快捷键**（可选）：单独按 **F1** 与 Win+Shift+F 相同（单窗 stack 切换）；设置 → 交互 →「启用 F1 stack 快捷键」/`EnableF1StackHotkey`，**默认启用**；关闭后不注册 F1 钩子，不影响 Win+Shift+F1 切换显示器。
+- **F6 直接快捷键**（可选）：单独按 **F6** 与 Win+Shift+F 相同；设置 → 交互 →「启用 F6 stack 快捷键」/`EnableF6StackHotkey`，**默认启用**；关闭后不注册 F6 钩子。
 
 ### 1.5 双显示器行为一致
 
@@ -53,7 +54,7 @@
 - **Stack 跨屏**：
   - 目标屏若已是 stack 模式，迁入窗口应**加入该屏 stack**，不得作为根级分屏占半屏。
   - 跨屏离开 stack 时记录转移；进入新屏后恢复 stack 归属。
-- **与 1.2 的区别**：托盘 Set Panel Stack 会 stack 各屏全部窗口；Win+Shift+F **只**作用于焦点窗，与整屏 stack 入口无关。
+- **与 1.2 的区别**：托盘一次 stack 本屏全部窗口；Win+Shift+F / F1 只 toggle **当前焦点窗**进出**同一**根级标签栏。
 
 ### 1.6 Stack 模式下新弹出窗口
 
@@ -137,7 +138,8 @@
 | 已采纳 | 窗口自动平铺采用白名单模式（§1.1），避免临时弹窗被自动拉伸 |
 | 已采纳 | Win+Shift 激活时仅保留快捷键列表提示，移除捐赠/评价等无关 toast（§1.7） |
 | 已采纳 | 辅助弹窗（查找/查询等）不纳入 stack，保持原尺寸浮动（§1.6） |
-| 已采纳 | Win+Shift+F 单窗 stack toggle；托盘逐句柄 stack（§1.2、§1.4） |
+| 已采纳 | Stack 统一使用显示器**顶部共享标签栏**（根 `StackPanel`）；托盘整屏并入、F6/Win+Shift+F 单窗 toggle 进出同一标签栏（§1.2–§1.4） |
+| 已废止 | ~~每窗/每进程独立 `WrapInStackPanel` stack 壳~~（2026-06-15 文档误记，非用户本意） |
 | 已采纳 | 问题与解决记入 `FancyWM-问题与解决记录.md`（Agent 见 `issue-resolution-log.mdc`） |
 
 ---
@@ -145,7 +147,7 @@
 ## 5. 文档维护约定（Agent 与用户）
 
 1. **改代码前**：阅读本文 §1、§2；浏览 `FancyWM-问题与解决记录.md` 相关条目。
-2. **改代码后**：更新本文 §1–§4（若涉及）；在 `FancyWM-问题与解决记录.md` 追加现象/期望/处理（规则见 `.cursor/rules/issue-resolution-log.mdc`）；写 `.github/pending_commit_notes.txt`。
+2. **改代码后**：更新本文 §1–§4（若涉及）；在 `FancyWM-问题与解决记录.md` **底部**追加条目（规则见 `issue-resolution-log.mdc`）；写 `.github/pending_commit_notes.txt`。
 3. **修复 BUG 或采纳建议后**：若涉及行为/需求，在 §3 或 §4 追加一行（日期、现象、处理、文件）。
 4. **新增主需求**：写入 §1，并注明快捷键/入口/多显示器等边界。
 5. **纯重构、无行为变化**：可不改本文；若不确定是否影响行为，宁可补一条说明。
@@ -156,8 +158,9 @@
 
 | 主题 | 主要位置 |
 |------|----------|
-| Set Panel Stack | `TilingService.Private.cs` → `SetPanelStackCore` |
-| Win+Shift+F Stack | `TilingService.cs` → `Stack()` / `StackWindow`；`TilingService.Private.cs` → `WrapFocusedNodeInStackPanel`、`EnsureRegisteredForManualStack` |
+| Set Panel Stack | `TilingService.Private.cs` → `SetPanelStackCore`、`CollectTaskbarVisibleWindowsOnThisDisplay` |
+| Win+Shift+F / F1 Stack | `TilingService.cs` → `Stack()` / `StackWindow`；`TilingService.Private.cs` → `TryJoinRootStack`、`FloatSingleWindowFromStack` |
+| 根级共享标签栏 | `TilingWorkspace.cs` → `GetOrCreateRootStackPanel`、`MergeWindowsIntoRootStack`、`StackAllWindows` |
 | 问题与解决全文 | `Design/Requiment/FancyWM-问题与解决记录.md` |
 | 标签同步 | `TilingOverlayRenderer.cs` → `SyncChildNodes`、`UpdateViewModels` |
 | 自动平铺白名单 | `TilingService.Private.cs` → `ShouldAutoTile`、`DetectChanges`；`MainWindow.xaml.cs` → `InclusionMatchers`；规则页 Include 列表 |

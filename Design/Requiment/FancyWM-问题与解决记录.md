@@ -5,14 +5,35 @@
 
 **Agent 必须遵守**：见 `.cursor/rules/issue-resolution-log.mdc`。
 
-最后更新：2026-06-15
+最后更新：2026-06-16
+
+---
+
+## 维护说明
+
+1. **新条目只在文件最底部追加**（以 `---` 与上一条分隔），**勿**在中间或文首日期区插入。
+2. 文首的**索引**、**记录格式**固定不动；仅当主文档 §3 有仅简表、本文无详述的条目时，酌情更新索引表。
+3. 若条目已写入主文档 §3，本文须写**更完整的用户原话与方案演进**（含走过的弯路，如「曾误改为 split」）。
+4. 改代码仍须同步 `FancyWM-主要需求与约定.md` §1–§4 与 `.github/pending_commit_notes.txt`。
+5. 查阅时从**底部向上**读最近条目即可；全文按时间**正序**排列（旧在上、新在下）。
+
+---
+
+## 索引：主文档 §3 中未展开条目的简述
+
+| 日期 | 标题 | 处理要点 | 文件 |
+|------|------|----------|------|
+| 2026-06-14 | 空 stack 标题栏崩溃 | `FirstOrDefault` | `TilingPanel.xaml.cs` |
+| 2026-06-14 | Monorepo 编译失败 | `GitVersionBaseDirectory` | `Directory.Build.props` |
+| 2026-06-14 | 再次 Stack 后标签全没 | overlay 修剪顺序 | `TilingOverlayRenderer.cs` |
+| 2026-06-14 | 全屏+弹窗后取消全屏仅半屏 | 保留空 stack、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
 
 ---
 
 ## 记录格式（新增条目请沿用）
 
 ```markdown
-### YYYY-MM-DD · 简短标题
+## YYYY-MM-DD · 简短标题
 
 - **现象**：用户看到什么问题
 - **用户期望**：客户想怎样
@@ -85,16 +106,13 @@
 ## 2026-06-15 · Win+Shift+F 与整屏 stack 职责混淆
 
 - **现象**：实现时把 F 当成整屏 stack 或取消后变成横向 split，与用户习惯不符。
-- **用户期望（明确）**：
-  1. **Win+Shift+F**：始终**单窗** stack 切换（当前激活窗口句柄）。
-  2. **整屏全部 stack**：**仅**托盘右键 Set Panel Stack，无其他入口。
-  3. 托盘 stack：对本屏每个符合条件句柄，**各执行一次**与 F「进入 stack」相同的单窗 `WrapInStackPanel`，不要 `StackAllWindows` 根级共享标签栏。
+- **用户期望（当时记录）**：
+  1. **Win+Shift+F**：单窗 stack 切换（当前激活窗口句柄）。
+  2. **整屏全部 stack**：**仅**托盘右键 Set Panel Stack。
+  3. （**已废止**，见 2026-06-16 澄清）托盘对各句柄 `WrapInStackPanel`、不要根级共享标签栏。
 - **原因**：`ApplyStackLayout` 多窗时调 `StackAllWindows`；默认快捷键 F 绑在 `ToggleFloatingMode` 上。
-- **最终处理**：
-  - `Stack()` → `StackWindow(FocusedWindow)`；`WrapFocusedNodeInStackPanel` 仅 `WrapInStackPanel(焦点节点)`。
-  - `SetPanelStackCore` → 遍历句柄 `TryEnterStackForWindow`。
-  - 默认键：`CreateStackPanel` = F，`ToggleFloatingMode` = T。
-  - 文件：`TilingService.Private.cs`、`TilingService.cs`、`BindableAction.cs`、`MainWindow.xaml.cs`；主需求 §1.2、§1.4。
+- **最终处理（已被 2026-06-16 澄清取代）**：曾拆分为 F 单窗 + 托盘逐句柄 `WrapInStackPanel`。  
+  文件：`TilingService.Private.cs`、`TilingService.cs`、`BindableAction.cs`、`MainWindow.xaml.cs`。
 
 ---
 
@@ -103,13 +121,11 @@
 - **现象**：F 可取消 stack，但再按 F 无法再次 stack；窗处于浮动，尺寸像居中缩小而非 stack 全屏。
 - **用户期望**：
   - **取消 stack**：恢复**原始窗口**（浮动 + 原尺寸/位置），**不要**改成 split 平铺。
-  - **再次 F**：应能再次单窗 stack。
+  - **再次 F**：应能再次 stack。
 - **原因（取消行为）**：中间误改为 `UnwrapStackShell` / `DetachWindowFromStackKeepTiled`（用户不要 split）。
-- **原因（无法再次 stack）**：浮动态重注册走 `TryRegisterAutoTiledWindowCore` 的 `IsStackModeActive` 根 stack 路径，只进共享标签栏，无法 `WrapInStackPanel`。
-- **最终处理**：
-  - 取消：**恢复** `FloatSingleWindowFromStack` → `floatingSet` + `UnregisterWindow` + `OnWindowFloated`。
-  - 再次 stack：新增 `EnsureRegisteredForManualStack`，用 `RegisterWindow(window, maxTreeWidth: 100)` 普通平铺注册后再 `WrapInStackPanel`。
-  - 文件：`TilingService.Private.cs`（`StackWindow`、`UnstackSingleWindow`、`EnsureRegisteredForManualStack`）。
+- **原因（无法再次 stack）**：浮动态重注册与 stack 路径不一致。
+- **最终处理**：取消用 `FloatSingleWindowFromStack`；再次 stack 见 2026-06-16 澄清（根级共享标签栏 + `TryJoinRootStack`）。  
+  文件：`TilingService.Private.cs`。
 - **回归测试**：F 进 stack → F 取消（原窗浮动）→ F 再进 stack，循环三次。
 
 ---
@@ -129,29 +145,48 @@
 
 - **现象**：托盘 Set Panel Stack 后，部分桌面上可见、任务栏有的窗口未进入 stack。
 - **原因**：
-  1. `TryEnterStackForWindow` 依赖 `DetectChanges` + 已注册节点，未注册窗口直接 `return false`（未走 `EnsureRegisteredForManualStack`）。
-  2. 枚举仅合并快照与 `m_windowSet`，且包含最大化窗（先还原再 stack），与用户「仅已还原可见窗」不符。
+  1. 未注册窗口未正确纳入 stack 流程。
+  2. 枚举未覆盖任务栏可见窗，且曾错误包含最大化窗。
 - **处理**：
-  - `CollectTaskbarVisibleWindowsOnThisDisplay`：`RefreshConfiguration` 后按 `GetSnapshot`（任务栏可见）+ 当前虚拟桌面 + `WindowState.Restored` + 本显示器筛选。
-  - `TryEnterStackForWindow` 改为 `EnsureRegisteredForManualStack`（与 Win+Shift+F 一致）。
+  - `CollectTaskbarVisibleWindowsOnThisDisplay`：`RefreshConfiguration` 后按 `GetSnapshot` + 已还原 + 本显示器筛选。
   - 跳过最小化/最大化；双屏仍由各 `TilingService` 分别处理本屏。
 - **文件**：`TilingService.Private.cs`；主需求 §1.2。
 
 ---
 
-## 索引：主文档 §3 中未展开条目的简述
+## 2026-06-16 · F1 再次 stack 报「堆叠面板不能包含其他面板」
 
-| 日期 | 标题 | 处理要点 | 文件 |
-|------|------|----------|------|
-| 2026-06-14 | 空 stack 标题栏崩溃 | `FirstOrDefault` | `TilingPanel.xaml.cs` |
-| 2026-06-14 | Monorepo 编译失败 | `GitVersionBaseDirectory` | `Directory.Build.props` |
-| 2026-06-14 | 再次 Stack 后标签全没 | overlay 修剪顺序 | `TilingOverlayRenderer.cs` |
-| 2026-06-14 | 全屏+弹窗后取消全屏仅半屏 | 保留空 stack、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
+- **现象**：托盘 Set Panel Stack 或 F1 取消 stack 后，再按 F1 提示 `NestingInStackPanel`。
+- **原因**：单窗独立 `WrapInStackPanel` 与根级共享 `StackPanel` 并存，注册路径冲突。
+- **处理（过渡，已废止）**：曾新增 `RegisterWindowForManualStack` 绕过根 stack；见下条用户澄清后改为 `TryJoinRootStack`。
+- **文件**：`TilingWorkspace.cs`、`TilingService.Private.cs`。
 
 ---
 
-## 维护说明
+## 2026-06-16 · 澄清：stack 须统一顶部共享标签栏（非每窗独立壳）
 
-1. **每次**用户报 BUG、澄清产品行为、或完成一轮实质性修复后，在本文**顶部日期区下追加一节**（最新在上亦可，但须保持格式一致）。
-2. 若条目已写入主文档 §3，本文须写**更完整的用户原话与方案演进**（含走过的弯路，如「曾误改为 split」）。
-3. 改代码仍须同步 `FancyWM-主要需求与约定.md` §1–§3 与 `.github/pending_commit_notes.txt`。
+- **用户原话**：「都放进顶部的 stack 标签，不是要每个进程独立设置 stack。」
+- **纠正**：2026-06-15 文档/实现曾写成托盘与 F 对各句柄 `WrapInStackPanel`（每窗独立 stack 壳）、「不得 `StackAllWindows`」——**与用户真实需求相反**，属 Agent 误记。
+- **用户期望（以本条为准）**：
+  1. 每块显示器 stack 模式下只有**一个**根级顶部标签栏（`GetOrCreateRootStackPanel`）。
+  2. **托盘 Set Panel Stack**：本屏符合条件窗口**全部并入**该标签栏。
+  3. **Win+Shift+F / F6**：仅 toggle **当前焦点窗**进出**同一**标签栏（取消仍浮动原尺寸）。
+  4. **不要**每窗/每进程一套独立 `WrapInStackPanel` stack 壳。
+- **处理**：
+  - `SetPanelStackCore` → 枚举本屏任务栏可见窗 + `MergeWindowsIntoRootStack`。
+  - `StackWindow` → `TryJoinRootStack`（根 stack 注册/merge）；取消仍 `FloatSingleWindowFromStack`。
+  - 废弃 `EnsureRegisteredForManualStack` / `RegisterWindowForManualStack` 路径。
+  - 主需求 §1.2–§1.4、§4 已按用户澄清重写。
+- **文件**：`TilingWorkspace.cs`、`TilingService.Private.cs`、`TilingService.cs`、主需求文档、`.cursor/rules/design-requirements.mdc`。
+
+---
+
+## 2026-06-16 · stack 直接快捷键由 F1 改为 F6
+
+- **用户期望**：可配置的 stack 直接快捷键使用 **F6**（原 F1），避免与系统/应用 F1 帮助冲突。
+- **处理**：
+  - `Settings.EnableF6StackHotkey`；`MainWindow.RebindF6StackHotkey` 注册 `KeyCode.F6`。
+  - 设置文案与主需求 §1.4 同步为 F6。
+- **文件**：`Settings.cs`、`SettingsViewModel.cs`、`MainWindow.xaml.cs`、`InteractionPage.xaml`、`Strings*.resx`。
+
+---

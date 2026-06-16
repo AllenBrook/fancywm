@@ -50,10 +50,10 @@
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel>
                     <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=EnableF1StackHotkey, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_EnableF1StackHotkey}" />
+                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=EnableF6StackHotkey, Mode=TwoWay}" />
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_EnableF6StackHotkey}" />
                     </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_EnableF1StackHotkey_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_EnableF6StackHotkey_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
                 </StackPanel>
             </Border>
 

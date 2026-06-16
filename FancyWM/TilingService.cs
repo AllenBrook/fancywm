@@ -556,16 +556,7 @@ namespace FancyWM
 
         public bool CanStack()
         {
-            // Win+Shift+F：焦点已在 stack 内可取消；否则可包裹焦点节点（单窗，非整屏）
-            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
-            if (focusedNode != null)
-            {
-                if (focusedNode.PathToRoot.OfType<StackPanelNode>().Any())
-                    return true;
-
-                return CanStack(focusedNode);
-            }
-
+            // 焦点窗可管理即可 toggle：在标签栏内则取消，否则加入根级共享 stack。
             var window = m_workspace.FocusedWindow;
             return window != null && CanManage(window, ignoreFloating: true);
         }

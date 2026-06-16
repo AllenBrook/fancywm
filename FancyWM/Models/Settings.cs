@@ -55,9 +55,9 @@ namespace FancyWM.Models
         public bool StackAppendRestoredTabsToEnd { get; init; } = true;
 
         /// <summary>
-        /// 单独按 F1 切换当前窗 stack（与 Win+Shift+F 相同）；默认启用。
+        /// 单独按 F6 切换当前窗 stack（与 Win+Shift+F 相同）；默认启用。
         /// </summary>
-        public bool EnableF1StackHotkey { get; init; } = true;
+        public bool EnableF6StackHotkey { get; init; } = true;
 
         public bool AnimateWindowMovement { get; init; } = true;
 

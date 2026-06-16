@@ -65,7 +65,7 @@ namespace FancyWM
 
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
-        private LowLevelHotkey? m_f1StackHk;
+        private LowLevelHotkey? m_f6StackHk;
         private ActivationHotkey m_activationHotkey = ActivationHotkey.Default;
 
         private readonly TaskbarIcon m_notifyIcon;
@@ -172,10 +172,10 @@ namespace FancyWM
                 .DistinctUntilChanged()
                 .Do(_ => Dispatcher.BeginInvoke(() => RebindDirectHotkeys(_)));
 
-            var f1StackHotkeySettings = settings
-                .Select(x => x.EnableF1StackHotkey)
+            var f6StackHotkeySettings = settings
+                .Select(x => x.EnableF6StackHotkey)
                 .DistinctUntilChanged()
-                .Do(_ => Dispatcher.BeginInvoke(() => RebindF1StackHotkey(_)));
+                .Do(_ => Dispatcher.BeginInvoke(() => RebindF6StackHotkey(_)));
 
             var multiMonitorObservable = settings
                 .Select(x => x.MultiMonitorSupport)
@@ -221,7 +221,7 @@ namespace FancyWM
                 activationHotkeySettings.Subscribe(new NotifyUnhandledObserver<ActivationHotkey>()),
                 activateOnCapsLockSetting.Subscribe(new NotifyUnhandledObserver<bool>()),
                 keybindingsSettings.Subscribe(new NotifyUnhandledObserver<KeybindingDictionary>()),
-                f1StackHotkeySettings.Subscribe(new NotifyUnhandledObserver<bool>()),
+                f6StackHotkeySettings.Subscribe(new NotifyUnhandledObserver<bool>()),
                 multiMonitorObservable
                     .Concat(inclusionListSettings)
                     .Subscribe(new NotifyUnhandledObserver<Unit>()),
@@ -524,15 +524,15 @@ namespace FancyWM
         }
 
         /// <summary>
-        /// 单独按 F1：与 Win+Shift+F 相同的单窗 stack 切换；可在设置中关闭（EnableF1StackHotkey）。
+        /// 单独按 F6：与 Win+Shift+F 相同的 stack 切换；可在设置中关闭（EnableF6StackHotkey）。
         /// </summary>
-        private void RebindF1StackHotkey(bool enabled)
+        private void RebindF6StackHotkey(bool enabled)
         {
-            if (m_f1StackHk != null)
+            if (m_f6StackHk != null)
             {
-                m_f1StackHk.Pressed -= OnF1StackHotkeyPressed;
-                m_f1StackHk.Dispose();
-                m_f1StackHk = null;
+                m_f6StackHk.Pressed -= OnF6StackHotkeyPressed;
+                m_f6StackHk.Dispose();
+                m_f6StackHk = null;
             }
 
             if (!enabled)
@@ -542,22 +542,22 @@ namespace FancyWM
 
             try
             {
-                m_f1StackHk = new LowLevelHotkey(m_llkbdHook, [], KeyCode.F1)
+                m_f6StackHk = new LowLevelHotkey(m_llkbdHook, [], KeyCode.F6)
                 {
                     HideKeyPress = true,
                     ScanOnRelease = false,
                     ClearModifiersOnMiss = true,
                     SideAgnostic = false,
                 };
-                m_f1StackHk.Pressed += OnF1StackHotkeyPressed;
+                m_f6StackHk.Pressed += OnF6StackHotkeyPressed;
             }
             catch (Win32Exception ex)
             {
-                m_logger.Warning(ex, "Failed to register F1 stack hotkey");
+                m_logger.Warning(ex, "Failed to register F6 stack hotkey");
             }
         }
 
-        private void OnF1StackHotkeyPressed(object? sender, EventArgs e)
+        private void OnF6StackHotkeyPressed(object? sender, EventArgs e)
         {
             OnDirectHotkeyPressed(BindableAction.CreateStackPanel);
         }
@@ -1709,9 +1709,9 @@ namespace FancyWM
                 hk.Dispose();
             }
 
-            m_f1StackHk?.Pressed -= OnF1StackHotkeyPressed;
-            m_f1StackHk?.Dispose();
-            m_f1StackHk = null;
+            m_f6StackHk?.Pressed -= OnF6StackHotkeyPressed;
+            m_f6StackHk?.Dispose();
+            m_f6StackHk = null;
 
             m_dispatcherTimer.Tick -= OnDispatcherTimerTick;
             m_dispatcherTimer?.Stop();

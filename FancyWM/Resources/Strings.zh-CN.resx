@@ -759,11 +759,11 @@
   <data name="Interaction.StackAppendRestoredTabsToEnd.Description" xml:space="preserve">
     <value>堆叠面板中最小化的窗口恢复后，将其标签放在最右侧。关闭此选项时，标签将回到原来的位置。</value>
   </data>
-  <data name="Interaction.EnableF1StackHotkey" xml:space="preserve">
-    <value>启用 F1 stack 快捷键</value>
+  <data name="Interaction.EnableF6StackHotkey" xml:space="preserve">
+    <value>启用 F6 stack 快捷键</value>
   </data>
-  <data name="Interaction.EnableF1StackHotkey.Description" xml:space="preserve">
-    <value>单独按 F1 切换当前焦点窗口的 stack（与 Win+Shift+F 相同）。不影响 Win+Shift+F1 切换显示器。</value>
+  <data name="Interaction.EnableF6StackHotkey.Description" xml:space="preserve">
+    <value>单独按 F6 切换当前焦点窗口的 stack（与 Win+Shift+F 相同）。</value>
   </data>
   <data name="Messages.NoPreviousDisplay" xml:space="preserve">
     <value>没有上一个显示器。</value>

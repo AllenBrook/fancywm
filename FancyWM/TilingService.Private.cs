@@ -442,9 +442,7 @@ namespace FancyWM
         }
 
         /// <summary>
-        /// Win+Shift+F 单窗 stack 切换。
-        /// - 已在 stack → 取消（浮动，恢复原始窗口，见 FloatSingleWindowFromStack）；
-        /// - 浮动态/未注册 → EnsureRegisteredForManualStack 后再 WrapInStackPanel。
+        /// Win+Shift+F / F6：焦点窗在 stack 标签栏内则取消浮动；否则并入本屏根级共享 stack 标签栏。
         /// </summary>
         private void StackWindow(IWindow window)
         {
@@ -456,15 +454,12 @@ namespace FancyWM
                 m_floatingSet.Remove(window);
             }
 
-            WindowNode? node;
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+
             using (m_backendLock.EnterScope())
             {
-                node = m_backend.FindWindow(window);
-            }
-
-            if (node != null)
-            {
-                using (m_backendLock.EnterScope())
+                var node = m_backend.FindWindow(window);
+                if (node != null)
                 {
                     var stack = node.PathToRoot.OfType<StackPanelNode>().FirstOrDefault();
                     if (stack != null)
@@ -472,109 +467,56 @@ namespace FancyWM
                         UnstackSingleWindow(node, stack);
                         return;
                     }
-
-                    if (!CanStack(node))
-                        throw new TilingFailedException(TilingError.NestingInStackPanel);
-
-                    WrapFocusedNodeInStackPanel(node);
                 }
 
-                return;
-            }
+                if (!TryJoinRootStack(window, desktop, setFocus: true))
+                    throw new TilingFailedException(TilingError.MissingTarget);
 
-            // 取消 stack 后处于浮动态、已注销：须先普通平铺注册，再单窗 Wrap（勿进根 stack 标签栏）
-            if (!EnsureRegisteredForManualStack(window, out node))
-                throw new TilingFailedException(TilingError.MissingTarget);
-
-            using (m_backendLock.EnterScope())
-            {
-                if (!CanStack(node!))
-                    throw new TilingFailedException(TilingError.NestingInStackPanel);
-
-                WrapFocusedNodeInStackPanel(node!);
+                InvalidateLayout();
             }
         }
 
         /// <summary>
-        /// 浮动态再次 Win+Shift+F 时，把窗口纳入平铺树。
-        /// 刻意不走 TryRegisterAutoTiledWindowCore 的 IsStackModeActive 根 stack 路径，
-        /// 否则只会进共享标签栏，无法 WrapInStackPanel 单窗 stack。
+        /// 将窗口并入本显示器布局树的根级 StackPanel（顶部共享标签栏）。
         /// </summary>
-        private bool EnsureRegisteredForManualStack(IWindow window, out WindowNode? node)
+        private bool TryJoinRootStack(IWindow window, IVirtualDesktop desktop, bool setFocus)
         {
-            node = null;
-            if (!CanManage(window, ignoreFloating: true))
-                return false;
-
-            using (m_backendLock.EnterScope())
+            try
             {
-                if (m_backend.HasWindow(window))
+                var rootStack = m_backend.GetOrCreateRootStackPanel(desktop);
+                WindowNode? node = m_backend.FindWindow(window);
+                if (node == null)
                 {
-                    node = m_backend.FindWindow(window);
-                    return node != null;
+                    node = m_backend.RegisterWindow(window, rootStack);
+                }
+                else if (node.Parent != rootStack)
+                {
+                    m_backend.MergeWindowsIntoRootStack(desktop, [node]);
                 }
 
-                try
-                {
-                    node = m_backend.RegisterWindow(window, maxTreeWidth: 100);
-                    node.Parent!.Padding = GetPanelPaddingRect();
-                    node.Parent!.Spacing = GetPanelSpacing();
-                    InvalidateLayout();
-                    return true;
-                }
-                catch (NoValidPlacementExistsException)
-                {
-                    PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
-                        TilingError.NoValidPlacementExists, window));
-                    return false;
-                }
-                catch (WindowAlreadyRegisteredException)
-                {
-                    node = m_backend.FindWindow(window);
-                    return node != null;
-                }
-                catch (InvalidWindowReferenceException)
-                {
-                    return false;
-                }
+                rootStack.Padding = GetPanelPaddingRect();
+                rootStack.Spacing = GetPanelSpacing();
+                if (setFocus)
+                    m_backend.SetFocus(node);
+
+                RepairRootStackLayout(desktop);
+                return true;
             }
-        }
-
-        /// <summary>
-        /// 托盘 Set Panel Stack：对单个句柄仅「进入 stack」（不 toggle）。
-        /// 已是单窗 stack 的跳过；逻辑与 Win+Shift+F 的 WrapInStackPanel 相同。
-        /// </summary>
-        private bool TryEnterStackForWindow(IWindow window, bool setFocus = false, bool invalidateLayout = false)
-        {
-            if (!CanManage(window, ignoreFloating: true))
-                return false;
-
-            if (window.State != WindowState.Restored)
-                return false;
-
-            using (m_floatingSetLock.EnterScope())
+            catch (NoValidPlacementExistsException)
             {
-                m_floatingSet.Remove(window);
-            }
-
-            if (!EnsureRegisteredForManualStack(window, out var node) || node == null)
+                PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
+                    TilingError.NoValidPlacementExists, window));
                 return false;
-
-            using (m_backendLock.EnterScope())
-            {
-                if (node.Parent == null)
-                    return false;
-
-                if (node.PathToRoot.OfType<StackPanelNode>().Any())
-                    return false;
-
-                if (!CanStack(node))
-                    return false;
-
-                WrapFocusedNodeInStackPanel(node, setFocus, invalidateLayout);
             }
-
-            return true;
+            catch (WindowAlreadyRegisteredException)
+            {
+                var node = m_backend.FindWindow(window);
+                return node != null;
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -611,8 +553,7 @@ namespace FancyWM
         }
 
         /// <summary>
-        /// 托盘「Set Panel Stack」：对本屏每个符合条件句柄，依次执行与 Win+Shift+F 相同的单窗 WrapInStackPanel。
-        /// 不建根级共享 stack，不调用 StackAllWindows。
+        /// 托盘「Set Panel Stack」：将本屏符合条件窗口全部并入根级 StackPanel（顶部共享标签栏）。
         /// </summary>
         private void SetPanelStackCore()
         {
@@ -624,6 +565,8 @@ namespace FancyWM
                 "Set panel stack: {Count} restored taskbar windows on display {Display}",
                 visibleWindows.Count, m_display);
 
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+            var nodesToMerge = new List<WindowNode>();
             var originalFocus = m_workspace.FocusedWindow;
 
             foreach (var window in visibleWindows)
@@ -646,11 +589,68 @@ namespace FancyWM
                     continue;
                 }
 
-                if (!TryEnterStackForWindow(window, setFocus: false, invalidateLayout: false))
+                using (m_floatingSetLock.EnterScope())
                 {
-                    m_logger.Debug(
-                        "Set panel stack: could not stack {Window}",
-                        window.DebugString());
+                    m_floatingSet.Remove(window);
+                }
+
+                using (m_backendLock.EnterScope())
+                {
+                    try
+                    {
+                        WindowNode? node = m_backend.FindWindow(window);
+                        if (node == null)
+                        {
+                            var rootStack = m_backend.GetOrCreateRootStackPanel(desktop);
+                            node = m_backend.RegisterWindow(window, rootStack);
+                        }
+
+                        if (node != null)
+                        {
+                            nodesToMerge.Add(node);
+                        }
+                    }
+                    catch (NoValidPlacementExistsException)
+                    {
+                        PlacementFailed?.Invoke(this, new TilingFailedEventArgs(
+                            TilingError.NoValidPlacementExists, window));
+                    }
+                    catch (WindowAlreadyRegisteredException)
+                    {
+                        if (m_backend.FindWindow(window) is WindowNode existing)
+                        {
+                            nodesToMerge.Add(existing);
+                        }
+                    }
+                    catch (InvalidWindowReferenceException)
+                    {
+                        m_logger.Debug(
+                            "Set panel stack: could not stack {Window}",
+                            window.DebugString());
+                    }
+                }
+            }
+
+            if (nodesToMerge.Count > 0)
+            {
+                using (m_backendLock.EnterScope())
+                {
+                    m_backend.MergeWindowsIntoRootStack(desktop, nodesToMerge);
+                    var rootStack = m_backend.GetOrCreateRootStackPanel(desktop);
+                    rootStack.Padding = GetPanelPaddingRect();
+                    rootStack.Spacing = GetPanelSpacing();
+
+                    var root = m_backend.GetTree(desktop)?.Root;
+                    if (root != null)
+                    {
+                        foreach (var panel in root.Nodes.OfType<PanelNode>())
+                        {
+                            panel.Padding = GetPanelPaddingRect();
+                            panel.Spacing = GetPanelSpacing();
+                        }
+                    }
+
+                    RepairRootStackLayout(desktop);
                 }
             }
 

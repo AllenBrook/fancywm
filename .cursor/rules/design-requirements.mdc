@@ -22,7 +22,7 @@ alwaysApply: true
    - BUG → §3 表格追加一行（日期、现象、原因/处理、相关文件）
    - 新主需求 → §1 增补条目
    - 已采纳建议 → §4 更新状态
-4. 同上情况**必须**在 `Design/Requiment/FancyWM-问题与解决记录.md` 追加完整条目（现象、用户期望、原因、最终处理），规则见 `issue-resolution-log.mdc`。
+4. 同上情况**必须**在 `FancyWM-问题与解决记录.md` **文件最底部**追加完整条目（现象、用户期望、原因、最终处理）；文首为索引与格式，**勿在中间插入**；规则见 `issue-resolution-log.mdc`。
 5. 更新文档 **不替代** `pending_commit_notes.txt`：有代码/脚本改动时仍按 `pending-commit-notes.mdc` 写提交备注。
 6. 仅问答、且未改仓库：不必改需求文档与问题记录。
 
@@ -32,6 +32,7 @@ alwaysApply: true
 - **自动平铺白名单**：仅规则 Include 列表匹配才自动平铺；临时弹窗默认浮动原尺寸
 - 托盘：非最大/最小窗口 **全部 stack**
 - Stack：**右键拖标签** 排序；标签与 stack 一致
-- **Win+Shift+F**：单窗 stack 切换（当前激活窗）；整屏 stack 仅托盘
+- **Win+Shift+F / F6**：单窗 toggle 进出**根级共享 stack 标签栏**；托盘整屏 stack 仅托盘
+- **Stack 标签栏**：每显示器**一个**顶部共享标签栏；**不得**每窗独立 stack 壳
 - **双屏**：stack 状态跨屏一致；stack 模式下主窗口进 stack，**辅助弹窗**（查找/查询等）浮动原尺寸
 - 构建：`latest` 全量、`latestmin` 增量 DLL

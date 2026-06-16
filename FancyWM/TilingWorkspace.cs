@@ -165,6 +165,47 @@ namespace FancyWM
             return RegisterWindow(window, parent, focusedNode as WindowNode);
         }
 
+        /// <summary>
+        /// Win+Shift+F / 托盘 stack：注册到普通分屏父节点，不自动并入根级共享 StackPanel。
+        /// </summary>
+        /// <remarks>已废弃：用户要求统一根级顶部标签栏，请用 <see cref="RegisterWindow(IWindow, PanelNode, WindowNode?)"/> 挂到根 StackPanel。</remarks>
+        [Obsolete("Use RegisterWindow(window, rootStack) for shared top tab bar stack.")]
+        internal WindowNode RegisterWindowForManualStack(IWindow window, int maxTreeWidth = 100)
+        {
+            var state = GetValidatedState(window);
+            var focusedNode = state.FocusedNode;
+            var parent = ResolveParent(state, focusedNode);
+            parent = ResolveParentWithWidthConstraint(parent, focusedNode, window, maxTreeWidth);
+            return RegisterWindow(window, parent, focusedNode as WindowNode);
+        }
+
+        /// <summary>
+        /// 将窗口节点并入本虚拟桌面的根级 StackPanel（顶部共享标签栏），并收拢根下其它子面板。
+        /// </summary>
+        internal void MergeWindowsIntoRootStack(IVirtualDesktop desktop, IReadOnlyList<WindowNode> windowNodes)
+        {
+            if (windowNodes.Count == 0)
+            {
+                return;
+            }
+
+            if (m_states.GetState(desktop) is not DesktopState state || state.DesktopTree.Root is not PanelNode root)
+            {
+                return;
+            }
+
+            var stack = GetOrCreateRootStackPanel(desktop);
+            MergeWindowsIntoStack(stack, windowNodes);
+
+            foreach (var child in root.Children.ToList())
+            {
+                if (child != stack)
+                {
+                    root.Detach(child);
+                }
+            }
+        }
+
         private static bool TryGetRootStackPanel(DesktopState state, out StackPanelNode stackPanel)
         {
             stackPanel = null!;
