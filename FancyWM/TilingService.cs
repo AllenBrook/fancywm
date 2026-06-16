@@ -556,6 +556,7 @@ namespace FancyWM
 
         public bool CanStack()
         {
+            // Win+Shift+F：焦点已在 stack 内可取消；否则可包裹焦点节点（单窗，非整屏）
             var focusedNode = GetFocusedTilingNode(ensureManaged: false);
             if (focusedNode != null)
             {
@@ -565,35 +566,27 @@ namespace FancyWM
                 return CanStack(focusedNode);
             }
 
-            using (m_backendLock.EnterScope())
-            {
-                var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
-                if (m_backend.IsFullyStacked(desktop))
-                    return false;
-            }
-
             var window = m_workspace.FocusedWindow;
             return window != null && CanManage(window, ignoreFloating: true);
         }
 
+        /// <summary>
+        /// 焦点窗是否位于 stack 内（Win+Shift+F 取消判定；不含「仅桌面处于 stack 模式但焦点不在 stack」）。
+        /// </summary>
+        public bool IsInStackLayout()
+        {
+            var focusedNode = GetFocusedTilingNode(ensureManaged: false);
+            return focusedNode?.PathToRoot.OfType<StackPanelNode>().Any() == true;
+        }
+
+        /// <summary>
+        /// Win+Shift+F：取当前激活窗口句柄，对该句柄做 stack 切换（见 StackWindow）。
+        /// </summary>
         public void Stack()
         {
-            var focusedNode = GetFocusedTilingNode(ensureManaged: true);
-            if (focusedNode == null || focusedNode.Parent == null)
-                throw new TilingFailedException(TilingError.MissingTarget);
-
-            using (m_backendLock.EnterScope())
-            {
-                var stack = focusedNode.PathToRoot.OfType<StackPanelNode>().FirstOrDefault();
-                if (stack != null)
-                {
-                    UnstackLayout(stack, focusedNode);
-                }
-                else
-                {
-                    ApplyStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop, focusedNode);
-                }
-            }
+            var window = m_workspace.FocusedWindow
+                ?? throw new TilingFailedException(TilingError.MissingTarget);
+            StackWindow(window);
         }
 
         public void SetPanelStack()

@@ -465,6 +465,11 @@ namespace FancyWM
             return GetActiveTilingService().CanStack();
         }
 
+        public bool IsInStackLayout()
+        {
+            return GetActiveTilingService().IsInStackLayout();
+        }
+
         public bool CanFloat()
         {
             return GetActiveTilingService().CanFloat();

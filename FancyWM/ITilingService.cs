@@ -32,6 +32,7 @@ namespace FancyWM
         bool CanSplit(bool vertical);
         void Split(bool vertical);
         bool CanStack();
+        bool IsInStackLayout();
         void Stack();
         void SetPanelStack();
         bool DiscoverWindows();

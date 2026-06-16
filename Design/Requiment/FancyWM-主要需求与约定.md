@@ -26,8 +26,9 @@
 
 ### 1.2 托盘「Set Panel Stack」
 
-- **行为**：通过托盘菜单，将当前显示器上**非最小化、非最大化**的可管理窗口全部纳入 **stack**。
-- **范围**：多显示器时，各显示器分别 stack 本屏窗口（`SetPanelStack` 对每个 `TilingService` 执行）。
+- **入口**：**仅**托盘右键菜单；无其他快捷键或入口可触发整屏 stack。
+- **行为**：对本屏每个**符合条件**的可管理窗口（按句柄逐个处理），各调用一次与 **Win+Shift+F 进入 stack 相同**的 `WrapInStackPanel`（单窗独立 stack 壳）；**不得**建根级共享 stack，**不得** `StackAllWindows`。
+- **范围**：多显示器时，各显示器分别对本屏窗口逐句柄执行（`SetPanelStack` 对每个 `TilingService` 执行）。
 - **最大化窗口**：stack 前应先尝试还原最大化窗口，再纳入 stack。
 
 ### 1.3 Stack 模式下的标签栏
@@ -37,9 +38,12 @@
 
 ### 1.4 Win + Shift + F 与 Stack
 
-- **用途**：对当前焦点布局**动态切换 stack**（`CreateStackPanel` / `Stack()`）。
-- **进入 stack**：焦点不在 stack 内时，将当前焦点布局进入 stack。
-- **取消 stack**：焦点已在 stack 内时，再按 Win+Shift+F 应取消该 stack；单窗口回到父面板，多窗口转为普通 split 布局。
+- **用途**：对**当前激活窗口**（`Workspace.FocusedWindow` 句柄）做 stack **单窗切换**（`Stack()` → `StackWindow`）。
+- **进入 stack**：焦点窗不在 stack 内时，**仅** `WrapInStackPanel(该窗节点)`。
+- **取消 stack**（再按 Win+Shift+F）：恢复**原始窗口**（浮动 + `OnWindowFloated` 原尺寸/位置），**不得**拆成 split 平铺。
+- **再次 stack**：浮动态须经 `EnsureRegisteredForManualStack` 普通平铺注册后再 `WrapInStackPanel`，勿误入根 stack 标签栏。
+- **与 1.2 的关系**：托盘 Set Panel Stack = 对本屏每个符合条件句柄**各执行一次**进入 stack（`TryEnterStackForWindow`，不 toggle）；Win+Shift+F 只作用于**当前激活**的那一个句柄。
+- **默认快捷键**：`CreateStackPanel` = Win+Shift+F；`ToggleFloatingMode`（单窗浮动）= Win+Shift+T。
 
 ### 1.5 双显示器行为一致
 
@@ -47,7 +51,7 @@
 - **Stack 跨屏**：
   - 目标屏若已是 stack 模式，迁入窗口应**加入该屏 stack**，不得作为根级分屏占半屏。
   - 跨屏离开 stack 时记录转移；进入新屏后恢复 stack 归属。
-- **与 1.2 的区别**：托盘 Set Panel Stack 会 stack 各屏全部窗口；Win+Shift+F 通常只 stack 当前活动屏的焦点布局。
+- **与 1.2 的区别**：托盘 Set Panel Stack 会 stack 各屏全部窗口；Win+Shift+F **只**作用于焦点窗，与整屏 stack 入口无关。
 
 ### 1.6 Stack 模式下新弹出窗口
 
@@ -117,7 +121,7 @@
 | 2026-06-14 | 双屏切换激活后 stack 标签变少 | Refresh 时白名单策略把已 stack 窗标为 floating，下次 DetectChanges 误注销 → 已注册窗不因 floating 注销；Refresh 仅处理本屏 | `TilingService*.cs`、`TilingOverlayRenderer.cs` |
 | 2026-06-14 | Stack 下同进程查找/查询弹窗被纳入 stack | 同进程新窗一律进 stack → `AuxiliaryWindowRules` 识别辅助弹窗并保持浮动 | `AuxiliaryWindowRules.cs`、`TilingService*.cs` |
 | 2026-06-14 | Stack + 全屏 + 弹窗后取消全屏仅半屏 | 空 stack 被移除 + 新窗注册到根分屏 → 保留空 stack、stack 模式注册策略、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
-| 2026-06-15 | Win+Shift+F 进入 stack 后无法取消 stack | `Stack()` 仅进入 stack，`CanStack()` 在已 stack 时返回 false → 焦点在 stack 内时改为拆回普通布局 | `TilingService*.cs` |
+| 2026-06-15 | 取消 stack 后无法再次 Win+Shift+F stack | 浮动态重注册误进根 stack 标签栏 → EnsureRegisteredForManualStack + RegisterWindow(maxTreeWidth) | `TilingService.Private.cs` |
 
 ---
 
@@ -131,16 +135,18 @@
 | 已采纳 | 窗口自动平铺采用白名单模式（§1.1），避免临时弹窗被自动拉伸 |
 | 已采纳 | Win+Shift 激活时仅保留快捷键列表提示，移除捐赠/评价等无关 toast（§1.7） |
 | 已采纳 | 辅助弹窗（查找/查询等）不纳入 stack，保持原尺寸浮动（§1.6） |
-| 待观察 | Win+Shift+F 是否改为严格 toggle（开/关 stack）— 未单独实现 |
+| 已采纳 | Win+Shift+F 单窗 stack toggle；托盘逐句柄 stack（§1.2、§1.4） |
+| 已采纳 | 问题与解决记入 `FancyWM-问题与解决记录.md`（Agent 见 `issue-resolution-log.mdc`） |
 
 ---
 
 ## 5. 文档维护约定（Agent 与用户）
 
-1. **改代码前**：阅读本文 §1、§2，确认不违背主需求。
-2. **修复 BUG 或采纳建议后**：若涉及行为/需求，在 §3 或 §4 追加一行（日期、现象、处理、文件）。
-3. **新增主需求**：写入 §1，并注明快捷键/入口/多显示器等边界。
-4. **纯重构、无行为变化**：可不改本文；若不确定是否影响行为，宁可补一条说明。
+1. **改代码前**：阅读本文 §1、§2；浏览 `FancyWM-问题与解决记录.md` 相关条目。
+2. **改代码后**：更新本文 §1–§4（若涉及）；在 `FancyWM-问题与解决记录.md` 追加现象/期望/处理（规则见 `.cursor/rules/issue-resolution-log.mdc`）；写 `.github/pending_commit_notes.txt`。
+3. **修复 BUG 或采纳建议后**：若涉及行为/需求，在 §3 或 §4 追加一行（日期、现象、处理、文件）。
+4. **新增主需求**：写入 §1，并注明快捷键/入口/多显示器等边界。
+5. **纯重构、无行为变化**：可不改本文；若不确定是否影响行为，宁可补一条说明。
 
 ---
 
@@ -149,7 +155,8 @@
 | 主题 | 主要位置 |
 |------|----------|
 | Set Panel Stack | `TilingService.Private.cs` → `SetPanelStackCore` |
-| Win+Shift+F Stack | `TilingService.cs` → `Stack()` / `ApplyStackLayout` |
+| Win+Shift+F Stack | `TilingService.cs` → `Stack()` / `StackWindow`；`TilingService.Private.cs` → `WrapFocusedNodeInStackPanel`、`EnsureRegisteredForManualStack` |
+| 问题与解决全文 | `Design/Requiment/FancyWM-问题与解决记录.md` |
 | 标签同步 | `TilingOverlayRenderer.cs` → `SyncChildNodes`、`UpdateViewModels` |
 | 自动平铺白名单 | `TilingService.Private.cs` → `ShouldAutoTile`、`DetectChanges`；`MainWindow.xaml.cs` → `InclusionMatchers`；规则页 Include 列表 |
 | 辅助弹窗识别 | `FancyWM/Utilities/AuxiliaryWindowRules.cs` |

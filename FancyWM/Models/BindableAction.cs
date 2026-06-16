@@ -30,13 +30,15 @@ namespace FancyWM.Models
         CreateHorizontalPanel,
         [DefaultKeybinding(KeyCode.V)]
         CreateVerticalPanel,
-        [DefaultKeybinding(KeyCode.S)]
+        // Win+Shift+F：stack 进入/取消 toggle（见 TilingService.Stack / UnstackLayout）
+        [DefaultKeybinding(KeyCode.F)]
         CreateStackPanel,
 
         // Group: Windows
         [DefaultKeybinding(KeyCode.Enter)]
         PullWindowUp,
-        [DefaultKeybinding(KeyCode.F)]
+        // 单窗浮动（原默认 F，现改为 T 以免与 stack toggle 冲突）
+        [DefaultKeybinding(KeyCode.T)]
         ToggleFloatingMode,
         [DefaultKeybinding(KeyCode.LeftCtrl, KeyCode.Left)]
         MoveLeft,

@@ -705,6 +705,7 @@ namespace FancyWM
                     //_ = ShowInfoToastAsync("Horizontal Panel", ToastDurationShort);
                     return;
                 case BindableAction.CreateStackPanel:
+                    // Win+Shift+F：进入 stack / 再次按下取消 stack（见 TilingService.Stack）
                     friendlyActionName = "wrap in stack panel";
                     //_ = ShowInfoToastAsync("Stack Panel", ToastDurationShort);
                     m_tiling.Stack();
@@ -719,8 +720,17 @@ namespace FancyWM
                     m_tiling.ToggleDesktop();
                     return;
                 case BindableAction.ToggleFloatingMode:
-                    friendlyActionName = "float window";
-                    m_tiling.Float();
+                    // 旧配置可能仍把 F 绑在 ToggleFloatingMode；stack 模式下 F 应取消 stack 而非单窗浮动
+                    if (m_tiling.IsInStackLayout())
+                    {
+                        friendlyActionName = "unwrap stack panel";
+                        m_tiling.Stack();
+                    }
+                    else
+                    {
+                        friendlyActionName = "float window";
+                        m_tiling.Float();
+                    }
                     //_ = ShowInfoToastAsync($"Floating Mode: {(state ? "On" : "off")}", ToastDurationShort);
                     return;
                 case BindableAction.MoveFocusLeft:
