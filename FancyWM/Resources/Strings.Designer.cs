@@ -511,6 +511,24 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Enable F1 stack hotkey.
+        /// </summary>
+        public static string Interaction_EnableF1StackHotkey {
+            get {
+                return ResourceManager.GetString("Interaction.EnableF1StackHotkey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Press F1 alone to toggle stack on the focused window (same as Win+Shift+F). Does not affect Win+Shift+F1 for switching displays..
+        /// </summary>
+        public static string Interaction_EnableF1StackHotkey_Description {
+            get {
+                return ResourceManager.GetString("Interaction.EnableF1StackHotkey.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Automatic split threshold ᴺᴱᵂ.
         /// </summary>
         public static string Interaction_AutoSplitCount {

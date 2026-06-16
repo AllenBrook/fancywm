@@ -65,6 +65,7 @@ namespace FancyWM
 
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
+        private LowLevelHotkey? m_f1StackHk;
         private ActivationHotkey m_activationHotkey = ActivationHotkey.Default;
 
         private readonly TaskbarIcon m_notifyIcon;
@@ -171,6 +172,11 @@ namespace FancyWM
                 .DistinctUntilChanged()
                 .Do(_ => Dispatcher.BeginInvoke(() => RebindDirectHotkeys(_)));
 
+            var f1StackHotkeySettings = settings
+                .Select(x => x.EnableF1StackHotkey)
+                .DistinctUntilChanged()
+                .Do(_ => Dispatcher.BeginInvoke(() => RebindF1StackHotkey(_)));
+
             var multiMonitorObservable = settings
                 .Select(x => x.MultiMonitorSupport)
                 .Take(1)
@@ -215,6 +221,7 @@ namespace FancyWM
                 activationHotkeySettings.Subscribe(new NotifyUnhandledObserver<ActivationHotkey>()),
                 activateOnCapsLockSetting.Subscribe(new NotifyUnhandledObserver<bool>()),
                 keybindingsSettings.Subscribe(new NotifyUnhandledObserver<KeybindingDictionary>()),
+                f1StackHotkeySettings.Subscribe(new NotifyUnhandledObserver<bool>()),
                 multiMonitorObservable
                     .Concat(inclusionListSettings)
                     .Subscribe(new NotifyUnhandledObserver<Unit>()),
@@ -514,6 +521,45 @@ namespace FancyWM
                 ClearModifiersOnMiss = true,
             };
             m_capsLockHk.Pressed += OnCmdSequenceBegin;
+        }
+
+        /// <summary>
+        /// 单独按 F1：与 Win+Shift+F 相同的单窗 stack 切换；可在设置中关闭（EnableF1StackHotkey）。
+        /// </summary>
+        private void RebindF1StackHotkey(bool enabled)
+        {
+            if (m_f1StackHk != null)
+            {
+                m_f1StackHk.Pressed -= OnF1StackHotkeyPressed;
+                m_f1StackHk.Dispose();
+                m_f1StackHk = null;
+            }
+
+            if (!enabled)
+            {
+                return;
+            }
+
+            try
+            {
+                m_f1StackHk = new LowLevelHotkey(m_llkbdHook, [], KeyCode.F1)
+                {
+                    HideKeyPress = true,
+                    ScanOnRelease = false,
+                    ClearModifiersOnMiss = true,
+                    SideAgnostic = false,
+                };
+                m_f1StackHk.Pressed += OnF1StackHotkeyPressed;
+            }
+            catch (Win32Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to register F1 stack hotkey");
+            }
+        }
+
+        private void OnF1StackHotkeyPressed(object? sender, EventArgs e)
+        {
+            OnDirectHotkeyPressed(BindableAction.CreateStackPanel);
         }
 
         private void RebindDirectHotkeys(KeybindingDictionary keybindings)
@@ -1662,6 +1708,10 @@ namespace FancyWM
             {
                 hk.Dispose();
             }
+
+            m_f1StackHk?.Pressed -= OnF1StackHotkeyPressed;
+            m_f1StackHk?.Dispose();
+            m_f1StackHk = null;
 
             m_dispatcherTimer.Tick -= OnDispatcherTimerTick;
             m_dispatcherTimer?.Stop();

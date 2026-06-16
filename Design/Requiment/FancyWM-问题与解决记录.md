@@ -114,6 +114,31 @@
 
 ---
 
+## 2026-06-15 · F1 单窗 stack 快捷键（可配置）
+
+- **需求**：Win+Shift+F 使用频繁，增加单独按 **F1** 触发相同单窗 stack 切换；可在设置中启用/关闭，**默认启用**。
+- **处理**：
+  - `Settings.EnableF1StackHotkey`（默认 `true`）；设置页交互区复选框。
+  - `MainWindow.RebindF1StackHotkey` 注册低级 F1 钩子，触发 `CreateStackPanel`（与 Win+Shift+F 同路径）。
+  - 与 `Win+Shift+F1`（切换显示器）无冲突：F1 为无修饰键直接模式。
+- **文件**：`Settings.cs`、`SettingsViewModel.cs`、`MainWindow.xaml.cs`、`InteractionPage.xaml`、`Strings*.resx`。
+
+---
+
+## 2026-06-16 · 托盘 Set Panel Stack 漏窗
+
+- **现象**：托盘 Set Panel Stack 后，部分桌面上可见、任务栏有的窗口未进入 stack。
+- **原因**：
+  1. `TryEnterStackForWindow` 依赖 `DetectChanges` + 已注册节点，未注册窗口直接 `return false`（未走 `EnsureRegisteredForManualStack`）。
+  2. 枚举仅合并快照与 `m_windowSet`，且包含最大化窗（先还原再 stack），与用户「仅已还原可见窗」不符。
+- **处理**：
+  - `CollectTaskbarVisibleWindowsOnThisDisplay`：`RefreshConfiguration` 后按 `GetSnapshot`（任务栏可见）+ 当前虚拟桌面 + `WindowState.Restored` + 本显示器筛选。
+  - `TryEnterStackForWindow` 改为 `EnsureRegisteredForManualStack`（与 Win+Shift+F 一致）。
+  - 跳过最小化/最大化；双屏仍由各 `TilingService` 分别处理本屏。
+- **文件**：`TilingService.Private.cs`；主需求 §1.2。
+
+---
+
 ## 索引：主文档 §3 中未展开条目的简述
 
 | 日期 | 标题 | 处理要点 | 文件 |

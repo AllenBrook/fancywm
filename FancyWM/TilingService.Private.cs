@@ -549,17 +549,20 @@ namespace FancyWM
             if (!CanManage(window, ignoreFloating: true))
                 return false;
 
+            if (window.State != WindowState.Restored)
+                return false;
+
             using (m_floatingSetLock.EnterScope())
             {
                 m_floatingSet.Remove(window);
             }
 
-            DetectChanges(window, manualRegistration: true);
+            if (!EnsureRegisteredForManualStack(window, out var node) || node == null)
+                return false;
 
             using (m_backendLock.EnterScope())
             {
-                var node = m_backend.FindWindow(window);
-                if (node == null || node.Parent == null)
+                if (node.Parent == null)
                     return false;
 
                 if (node.PathToRoot.OfType<StackPanelNode>().Any())
@@ -614,32 +617,12 @@ namespace FancyWM
         private void SetPanelStackCore()
         {
             m_logger.Information("Setting panel stack for visible windows on display {Display}", m_display);
-            DiscoverWindows();
+            m_workspace.RefreshConfiguration();
 
-            var candidates = new HashSet<IWindow>();
-            foreach (var window in m_workspace.GetCurrentDesktopSnapshot())
-            {
-                if (window.State != WindowState.Minimized)
-                {
-                    candidates.Add(window);
-                }
-            }
-
-            using (m_windowSetLock.EnterScope())
-            {
-                foreach (var window in m_windowSet)
-                {
-                    if (window.State != WindowState.Minimized)
-                    {
-                        candidates.Add(window);
-                    }
-                }
-            }
-
-            var visibleWindows = candidates
-                .Where(IsWindowOnThisDisplay)
-                .Where(w => w.Position.Width > 0 && w.Position.Height > 0)
-                .ToList();
+            var visibleWindows = CollectTaskbarVisibleWindowsOnThisDisplay();
+            m_logger.Debug(
+                "Set panel stack: {Count} restored taskbar windows on display {Display}",
+                visibleWindows.Count, m_display);
 
             var originalFocus = m_workspace.FocusedWindow;
 
@@ -657,26 +640,18 @@ namespace FancyWM
 
                 if (!CanManage(window, ignoreFloating: true))
                 {
+                    m_logger.Debug(
+                        "Set panel stack: skip {Window} (cannot manage)",
+                        window.DebugString());
                     continue;
                 }
 
-                if (window.State == WindowState.Maximized)
+                if (!TryEnterStackForWindow(window, setFocus: false, invalidateLayout: false))
                 {
-                    try
-                    {
-                        window.SetState(WindowState.Restored);
-                    }
-                    catch (Exception ex) when (ex is Win32Exception or InvalidWindowReferenceException or InvalidOperationException)
-                    {
-                        m_logger.Debug(
-                            "Could not restore {Window} before panel stack: {Message}",
-                            window.DebugString(), ex.Message);
-                        continue;
-                    }
+                    m_logger.Debug(
+                        "Set panel stack: could not stack {Window}",
+                        window.DebugString());
                 }
-
-                // 每个句柄单独走 Win+Shift+F 的进入 stack 路径（不 toggle）
-                TryEnterStackForWindow(window, setFocus: false, invalidateLayout: false);
             }
 
             if (originalFocus != null)
@@ -695,6 +670,41 @@ namespace FancyWM
             }
 
             InvalidateLayout();
+        }
+
+        /// <summary>
+        /// 当前虚拟桌面上、任务栏可见（GetSnapshot）、已还原且落在此显示器上的窗口。
+        /// 跳过最小化与最大化；不依赖 m_windowSet 是否已跟踪。
+        /// </summary>
+        private List<IWindow> CollectTaskbarVisibleWindowsOnThisDisplay()
+        {
+            var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+            var candidates = new HashSet<IWindow>();
+
+            foreach (var window in m_workspace.GetSnapshot())
+            {
+                if (!desktop.HasWindow(window))
+                    continue;
+
+                if (window.State != WindowState.Restored)
+                    continue;
+
+                candidates.Add(window);
+            }
+
+            using (m_windowSetLock.EnterScope())
+            {
+                foreach (var window in m_windowSet)
+                {
+                    if (window.State == WindowState.Restored)
+                        candidates.Add(window);
+                }
+            }
+
+            return candidates
+                .Where(IsWindowOnThisDisplay)
+                .Where(w => w.Position.Width > 0 && w.Position.Height > 0)
+                .ToList();
         }
 
         private int CountTiledManagedWindows()

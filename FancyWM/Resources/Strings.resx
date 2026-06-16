@@ -759,6 +759,12 @@
   <data name="Interaction.StackAppendRestoredTabsToEnd.Description" xml:space="preserve">
     <value>When a minimized window is restored in a stack panel, place its tab at the rightmost position. When disabled, tabs return to their previous order.</value>
   </data>
+  <data name="Interaction.EnableF1StackHotkey" xml:space="preserve">
+    <value>Enable F1 stack hotkey</value>
+  </data>
+  <data name="Interaction.EnableF1StackHotkey.Description" xml:space="preserve">
+    <value>Press F1 alone to toggle stack on the focused window (same as Win+Shift+F). Does not affect Win+Shift+F1 for switching displays.</value>
+  </data>
   <data name="Messages.NoPreviousDisplay" xml:space="preserve">
     <value>No previous display.</value>
   </data>

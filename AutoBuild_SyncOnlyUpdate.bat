@@ -29,7 +29,7 @@ echo   To  : %LATEST_MIN_DIR%
 
 set "COPY_FAILED=0"
 
-for %%F in (FancyWM.dll FancyWM-GUI.exe FancyWM-GUI.dll) do (
+for %%F in (FancyWM.dll FancyWM.exe FancyWM-GUI.exe FancyWM-GUI.dll) do (
     if not exist "%SOURCE_DIR%\%%F" (
         echo [ERROR] Required update file not found: %SOURCE_DIR%\%%F
         set "COPY_FAILED=1"

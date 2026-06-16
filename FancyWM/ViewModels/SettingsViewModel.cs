@@ -38,6 +38,7 @@ namespace FancyWM.ViewModels
         public bool AllocateNewPanelSpace { get => m_allocateNewPanelSpace; set => SetField(ref m_allocateNewPanelSpace, value); }
         public bool AutoCollapsePanels { get => m_autoCollapsePanels; set => SetField(ref m_autoCollapsePanels, value); }
         public bool StackAppendRestoredTabsToEnd { get => m_stackAppendRestoredTabsToEnd; set => SetField(ref m_stackAppendRestoredTabsToEnd, value); }
+        public bool EnableF1StackHotkey { get => m_enableF1StackHotkey; set => SetField(ref m_enableF1StackHotkey, value); }
         public int AutoSplitCount { get => m_autoSplitCount; set => SetField(ref m_autoSplitCount, value); }
 
         public bool DelayReposition { get => m_delayReposition; set => SetField(ref m_delayReposition, value); }
@@ -212,6 +213,7 @@ namespace FancyWM.ViewModels
         private bool m_allocateNewPanelSpace;
         private bool m_autoCollapsePanels;
         private bool m_stackAppendRestoredTabsToEnd = true;
+        private bool m_enableF1StackHotkey = true;
         private int m_autoSplitCount;
         private bool m_delayReposition;
         private bool m_customAccentColor;
@@ -258,6 +260,7 @@ namespace FancyWM.ViewModels
                     AllocateNewPanelSpace = settings.AllocateNewPanelSpace;
                     AutoCollapsePanels = settings.AutoCollapsePanels;
                     StackAppendRestoredTabsToEnd = settings.StackAppendRestoredTabsToEnd;
+                    EnableF1StackHotkey = settings.EnableF1StackHotkey;
                     AutoSplitCount = settings.AutoSplitCount;
                     DelayReposition = settings.DelayReposition;
                     AnimateWindowMovement = settings.AnimateWindowMovement;
@@ -386,6 +389,7 @@ namespace FancyWM.ViewModels
                     AllocateNewPanelSpace = AllocateNewPanelSpace,
                     AutoCollapsePanels = AutoCollapsePanels,
                     StackAppendRestoredTabsToEnd = StackAppendRestoredTabsToEnd,
+                    EnableF1StackHotkey = EnableF1StackHotkey,
                     AutoSplitCount = AutoSplitCount,
                     DelayReposition = DelayReposition,
                     AnimateWindowMovement = AnimateWindowMovement,

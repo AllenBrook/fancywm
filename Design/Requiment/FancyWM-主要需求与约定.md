@@ -29,7 +29,8 @@
 - **入口**：**仅**托盘右键菜单；无其他快捷键或入口可触发整屏 stack。
 - **行为**：对本屏每个**符合条件**的可管理窗口（按句柄逐个处理），各调用一次与 **Win+Shift+F 进入 stack 相同**的 `WrapInStackPanel`（单窗独立 stack 壳）；**不得**建根级共享 stack，**不得** `StackAllWindows`。
 - **范围**：多显示器时，各显示器分别对本屏窗口逐句柄执行（`SetPanelStack` 对每个 `TilingService` 执行）。
-- **最大化窗口**：stack 前应先尝试还原最大化窗口，再纳入 stack。
+- **窗口枚举**：刷新工作区后，遍历当前虚拟桌面上**任务栏可见**窗口（`GetSnapshot` / `IsTopLevelVisible`）；仅处理 **已还原**（非最小化、非最大化）且落在该显示器上的窗口；未纳入 `m_windowSet` 的窗口亦须 stack（经 `EnsureRegisteredForManualStack` 注册）。
+- **跳过**：最小化、最大化、辅助弹窗（§1.6）、`CanManage` 为 false 的窗口。
 
 ### 1.3 Stack 模式下的标签栏
 
@@ -44,6 +45,7 @@
 - **再次 stack**：浮动态须经 `EnsureRegisteredForManualStack` 普通平铺注册后再 `WrapInStackPanel`，勿误入根 stack 标签栏。
 - **与 1.2 的关系**：托盘 Set Panel Stack = 对本屏每个符合条件句柄**各执行一次**进入 stack（`TryEnterStackForWindow`，不 toggle）；Win+Shift+F 只作用于**当前激活**的那一个句柄。
 - **默认快捷键**：`CreateStackPanel` = Win+Shift+F；`ToggleFloatingMode`（单窗浮动）= Win+Shift+T。
+- **F1 直接快捷键**（可选）：单独按 **F1** 与 Win+Shift+F 相同（单窗 stack 切换）；设置 → 交互 →「启用 F1 stack 快捷键」/`EnableF1StackHotkey`，**默认启用**；关闭后不注册 F1 钩子，不影响 Win+Shift+F1 切换显示器。
 
 ### 1.5 双显示器行为一致
 
@@ -97,11 +99,11 @@
 
 **`latestmin` 内容**（覆盖到目标机已有完整安装目录）：
 
-- `FancyWM.dll`
+- `FancyWM.dll`、`FancyWM.exe`
 - `FancyWM-GUI.exe`、`FancyWM-GUI.dll`
 - 各语言目录下的 `FancyWM.resources.dll`（若存在）
 
-目标机使用 Framework 构建时需安装 **.NET 10 Desktop Runtime**。资源与 XAML 已编译进 DLL，**不能**只换 `FancyWM.dll` 而忽略 `FancyWM-GUI.exe` 等启动文件。
+目标机使用 Framework 构建时需安装 **.NET 10 Desktop Runtime**。资源与 XAML 已编译进 DLL，**不能**只换 `FancyWM.dll` 而忽略 `FancyWM.exe`、`FancyWM-GUI.exe` 等启动文件。
 
 ### 2.3 提交工作流
 
