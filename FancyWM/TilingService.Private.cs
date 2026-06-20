@@ -123,7 +123,9 @@ namespace FancyWM
 
                 UpdateTree(tree);
 
-                snapshot = tree.Root!.Nodes.Skip(1).ToList();
+                snapshot = tree.Root!.Nodes.Skip(1)
+                    .Where(n => n is not StackPanelNode stack || stack.Children.Count > 0)
+                    .ToList();
                 focusedNode = m_backend.GetFocus(desktop);
                 focusedPath = (IReadOnlyCollection<TilingNode>?)focusedNode?.PathToRoot?.ToList() ?? [];
             }
@@ -1786,6 +1788,21 @@ namespace FancyWM
             }
         }
 
+        private void RestoreFromMaximizedWithoutStack(IWindow window)
+        {
+            using (m_savedLocationsLock.EnterScope())
+            {
+                m_savedLocations.Remove(window);
+            }
+
+            using (m_floatingSetLock.EnterScope())
+            {
+                m_floatingSet.Add(window);
+            }
+
+            InvalidateLayout();
+        }
+
         private void OnWindowStateChanged(object? sender, WindowStateChangedEventArgs e)
         {
             if (!m_active)
@@ -1973,6 +1990,13 @@ namespace FancyWM
                         {
                             return;
                         }
+
+                        if (e.OldState == WindowState.Maximized && !m_autoStackOnUnmaximize)
+                        {
+                            RestoreFromMaximizedWithoutStack(e.Source);
+                            return;
+                        }
+
                         RegisterAndRestoreLocation();
                     }
                     else

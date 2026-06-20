@@ -33,8 +33,7 @@ namespace FancyWM.Utilities
             if (string.IsNullOrWhiteSpace(themeFileName))
                 throw new ArgumentException("Current theme file name must not be empty.", nameof(themeFileName));
 
-            Directory.CreateDirectory(themeDir);
-            _themeDir = Path.GetFullPath(themeDir);
+            _themeDir = EnsureThemeDirectory(themeDir);
 
             GetDefaultCss().Subscribe(UpdateDefaultCss);
             Debug.Assert(_defaultCss != null);
@@ -61,6 +60,30 @@ namespace FancyWM.Utilities
             ApplyFromFile();
 
             StartWatcher(themeFileName);
+        }
+
+        private static string EnsureThemeDirectory(string themeDir)
+        {
+            var fullPath = Path.GetFullPath(themeDir);
+
+            if (File.Exists(fullPath))
+            {
+                throw new IOException($"Theme path exists as a file, not a directory: {fullPath}");
+            }
+
+            if (Directory.Exists(fullPath))
+            {
+                return fullPath;
+            }
+
+            var parent = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(parent) && !Directory.Exists(parent))
+            {
+                Directory.CreateDirectory(parent);
+            }
+
+            Directory.CreateDirectory(fullPath);
+            return fullPath;
         }
 
         private static void WriteDefaultCss()

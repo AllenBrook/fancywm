@@ -2,6 +2,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using FancyWM.Utilities;
+
 namespace FancyWM.Models
 {
     public class AppState
@@ -10,10 +12,13 @@ namespace FancyWM.Models
 
         public AppState()
         {
-            Settings = new ObservableJsonEntityWithCommentPreservation<Settings>(Path.GetFullPath("settings.json"),
+            Settings = new ObservableJsonEntityWithCommentPreservation<Settings>(AppPaths.SettingsFile,
                 () => new Settings
                 {
                     AutoFloatNewWindows = true,
+                    UiLanguage = LocalizationService.ChineseSimplified,
+                    RunsAsAdministrator = true,
+                    AutoStackOnUnmaximize = true,
                 },
                 new JsonSerializerOptions
                 {

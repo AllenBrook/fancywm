@@ -27,10 +27,12 @@ echo Syncing latest...
 echo   From: %SOURCE_DIR%
 echo   To  : %LATEST_DIR%
 
-robocopy "%SOURCE_DIR%" "%LATEST_DIR%" /MIR /NFL /NDL /NJH /NJS /NC /NS >nul
+robocopy "%SOURCE_DIR%" "%LATEST_DIR%" /MIR /XD themes /NFL /NDL /NJH /NJS /NC /NS >nul
 if errorlevel 8 (
     echo [ERROR] Failed to sync latest folder.
     exit /b 1
 )
+
+if not exist "%LATEST_DIR%\themes" mkdir "%LATEST_DIR%\themes"
 
 exit /b 0

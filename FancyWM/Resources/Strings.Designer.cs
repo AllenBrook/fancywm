@@ -529,6 +529,24 @@ namespace FancyWM.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Return to stack when unmaximizing.
+        /// </summary>
+        public static string Interaction_AutoStackOnUnmaximize {
+            get {
+                return ResourceManager.GetString("Interaction.AutoStackOnUnmaximize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to When a stacked window is restored from maximized, automatically rejoin the top stack tab bar. When disabled, the window stays floating until you stack it manually..
+        /// </summary>
+        public static string Interaction_AutoStackOnUnmaximize_Description {
+            get {
+                return ResourceManager.GetString("Interaction.AutoStackOnUnmaximize.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Automatic split threshold ᴺᴱᵂ.
         /// </summary>
         public static string Interaction_AutoSplitCount {

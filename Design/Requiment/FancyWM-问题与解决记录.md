@@ -190,3 +190,45 @@
 - **文件**：`Settings.cs`、`SettingsViewModel.cs`、`MainWindow.xaml.cs`、`InteractionPage.xaml`、`Strings*.resx`。
 
 ---
+
+## 2026-06-16 · 全部最小化后仍显示空 stack 标签栏
+
+- **现象**：所有窗口已最小化，屏幕顶部仍显示 stack 标签栏（空栏）。
+- **用户期望**：无可见 stack 窗口时不应显示标签栏。
+- **原因**：最大化/最小化时窗口从布局树注销，根级 `StackPanel` 刻意保留为空（`PanelNode.RemoveIfEmpty`），overlay 仍渲染该空 panel。
+- **处理**：`UpdateLayoutAsync` 构建 snapshot 时过滤 `Children.Count == 0` 的 `StackPanelNode`。
+- **文件**：`TilingService.Private.cs`；主需求 §1.3。
+
+---
+
+## 2026-06-16 · 取消最大化自动进 stack 无开关
+
+- **现象**：stack 中窗口取消最大化后自动回到 stack 标签栏，无法关闭；用户认为缺配置项。
+- **用户期望**：保留默认自动回 stack 行为，但提供设置开关；关闭后取消最大化保持浮动，可手动 F6 再进 stack。
+- **处理**：`Settings.AutoStackOnUnmaximize`（默认 `true`）；`OnWindowStateChanged` 在 `Maximized → Restored` 且关闭时走 `RestoreFromMaximizedWithoutStack`（仅浮动，不注册 stack）；**最小化还原**不受影响。
+- **文件**：`Settings.cs`、`SettingsViewModel.cs`、`MainWindow.xaml.cs`、`InteractionPage.xaml`、`Strings*.resx`；主需求 §1.4。
+
+---
+
+## 2026-06-20 · 启动崩溃：找不到 themes 目录
+
+- **现象**：从 `Release\latest` 启动报 `FileNotFoundException`，路径 `...\Release\latest\themes`，堆栈在 `ThemeEngineManager.Initialize` → `Directory.CreateDirectory`。
+- **原因**：`Path.GetFullPath("themes")` 依赖当前工作目录；`robocopy /MIR` 同步 `latest` 时会删掉构建产物中不存在的 `themes` 目录（及用户 `custom.css`）。
+- **处理**：
+  - 新增 `AppPaths`：主题/配置路径统一为 `AppContext.BaseDirectory` 下。
+  - `ThemeEngineManager.EnsureThemeDirectory` 先确保父目录存在再创建。
+  - `AutoBuild_SyncLastRelease.bat`：`/XD themes` 保留用户主题目录，并在同步后 `mkdir themes`（若不存在）。
+- **文件**：`AppPaths.cs`、`ThemeEngineManager.cs`、`MainWindow.xaml.cs`、`Startup.cs`、`AppState.cs`、`AutoBuild_SyncLastRelease.bat`。
+
+---
+
+## 2026-06-20 · 默认设置改为中文 / 管理员 / 取消最大化回 stack
+
+- **用户期望**：首次安装默认简体中文、默认 UAC 管理员启动、取消最大化自动进 stack 默认开启。
+- **处理**：
+  - `Settings.UiLanguage` 默认 `zh-CN`；`LocalizationService` 无配置时回退中文。
+  - 新增 `Settings.RunsAsAdministrator`（默认 `true`）；`Startup.ShouldRunAsAdministrator` 读 settings / 旧 `administrator-mode` 标记。
+  - `AutoStackOnUnmaximize` 保持默认 `true`（§1.4）；`AppState` 工厂默认值与 `SettingsViewModel` 字段默认对齐。
+- **文件**：`Settings.cs`、`AppState.cs`、`LocalizationService.cs`、`Startup.cs`、`SettingsViewModel.cs`；主需求 §1.8。
+
+---

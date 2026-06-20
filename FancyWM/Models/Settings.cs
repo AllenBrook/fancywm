@@ -19,6 +19,8 @@ namespace FancyWM.Models
         bool DelayReposition { get; }
         bool AutoFloatNewWindows { get; }
         bool StackAppendRestoredTabsToEnd { get; }
+        /// <summary>取消最大化后是否自动回到 stack 标签栏；默认 true。</summary>
+        bool AutoStackOnUnmaximize { get; }
     }
 
     [AttributeUsage(AttributeTargets.Field)]
@@ -58,6 +60,11 @@ namespace FancyWM.Models
         /// 单独按 F6 切换当前窗 stack（与 Win+Shift+F 相同）；默认启用。
         /// </summary>
         public bool EnableF6StackHotkey { get; init; } = true;
+
+        /// <summary>
+        /// 取消最大化后自动回到 stack 标签栏；关闭则保持浮动（不自动进 stack）。
+        /// </summary>
+        public bool AutoStackOnUnmaximize { get; init; } = true;
 
         public bool AnimateWindowMovement { get; init; } = true;
 
@@ -99,6 +106,10 @@ namespace FancyWM.Models
 
         public bool CheckForUpdates { get; init; } = true;
 
-        public string UiLanguage { get; init; } = "en";
+        /// <summary>界面语言；默认简体中文。</summary>
+        public string UiLanguage { get; init; } = LocalizationService.ChineseSimplified;
+
+        /// <summary>启动时请求管理员权限（UAC）；默认启用。</summary>
+        public bool RunsAsAdministrator { get; init; } = true;
     }
 }

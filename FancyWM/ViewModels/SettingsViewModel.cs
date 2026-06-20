@@ -39,6 +39,7 @@ namespace FancyWM.ViewModels
         public bool AutoCollapsePanels { get => m_autoCollapsePanels; set => SetField(ref m_autoCollapsePanels, value); }
         public bool StackAppendRestoredTabsToEnd { get => m_stackAppendRestoredTabsToEnd; set => SetField(ref m_stackAppendRestoredTabsToEnd, value); }
         public bool EnableF6StackHotkey { get => m_enableF6StackHotkey; set => SetField(ref m_enableF6StackHotkey, value); }
+        public bool AutoStackOnUnmaximize { get => m_autoStackOnUnmaximize; set => SetField(ref m_autoStackOnUnmaximize, value); }
         public int AutoSplitCount { get => m_autoSplitCount; set => SetField(ref m_autoSplitCount, value); }
 
         public bool DelayReposition { get => m_delayReposition; set => SetField(ref m_delayReposition, value); }
@@ -101,11 +102,11 @@ namespace FancyWM.ViewModels
             {
                 if (value)
                 {
-                    File.WriteAllBytes("administrator-mode", []);
+                    File.WriteAllBytes(AppPaths.AdministratorModeMarker, []);
                 }
-                else
+                else if (File.Exists(AppPaths.AdministratorModeMarker))
                 {
-                    File.Delete("administrator-mode");
+                    File.Delete(AppPaths.AdministratorModeMarker);
                 }
                 SetField(ref m_runsAsAdministrator, value);
             }
@@ -207,13 +208,14 @@ namespace FancyWM.ViewModels
         public bool SoundOnFailure { get => m_soundOnFailure; set => SetField(ref m_soundOnFailure, value); }
 
         private bool m_runsAtStartup;
-        private bool m_runsAsAdministrator;
+        private bool m_runsAsAdministrator = true;
         private bool m_showStartupWindow;
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private bool m_allocateNewPanelSpace;
         private bool m_autoCollapsePanels;
         private bool m_stackAppendRestoredTabsToEnd = true;
         private bool m_enableF6StackHotkey = true;
+        private bool m_autoStackOnUnmaximize = true;
         private int m_autoSplitCount;
         private bool m_delayReposition;
         private bool m_customAccentColor;
@@ -234,7 +236,7 @@ namespace FancyWM.ViewModels
         private IList<string>? m_processInstanceIncludeList;
         private IList<string>? m_classIncludeList;
         private bool m_multiMonitorSupport;
-        private string m_uiLanguage = LocalizationService.English;
+        private string m_uiLanguage = LocalizationService.ChineseSimplified;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
         private bool m_showFocus;
@@ -261,6 +263,7 @@ namespace FancyWM.ViewModels
                     AutoCollapsePanels = settings.AutoCollapsePanels;
                     StackAppendRestoredTabsToEnd = settings.StackAppendRestoredTabsToEnd;
                     EnableF6StackHotkey = settings.EnableF6StackHotkey;
+                    AutoStackOnUnmaximize = settings.AutoStackOnUnmaximize;
                     AutoSplitCount = settings.AutoSplitCount;
                     DelayReposition = settings.DelayReposition;
                     AnimateWindowMovement = settings.AnimateWindowMovement;
@@ -276,6 +279,7 @@ namespace FancyWM.ViewModels
                     ClassIncludeList = settings.ClassIncludeList;
                     MultiMonitorSupport = settings.MultiMonitorSupport;
                     UiLanguage = settings.UiLanguage;
+                    RunsAsAdministrator = settings.RunsAsAdministrator;
                     ShowContextHints = settings.ShowContextHints;
                     SoundOnFailure = settings.SoundOnFailure;
                     ShowFocus = settings.ShowFocus;
@@ -313,11 +317,6 @@ namespace FancyWM.ViewModels
                         });
                 });
             });
-
-            if (File.Exists("administrator-mode"))
-            {
-                SetField(ref m_runsAsAdministrator, true, nameof(RunsAsAdministrator));
-            }
         }
 
         private void OnKeybindingPropertyChanged(object? c, System.ComponentModel.PropertyChangedEventArgs e)
@@ -390,6 +389,7 @@ namespace FancyWM.ViewModels
                     AutoCollapsePanels = AutoCollapsePanels,
                     StackAppendRestoredTabsToEnd = StackAppendRestoredTabsToEnd,
                     EnableF6StackHotkey = EnableF6StackHotkey,
+                    AutoStackOnUnmaximize = AutoStackOnUnmaximize,
                     AutoSplitCount = AutoSplitCount,
                     DelayReposition = DelayReposition,
                     AnimateWindowMovement = AnimateWindowMovement,
@@ -407,6 +407,7 @@ namespace FancyWM.ViewModels
                     ClassIncludeList = [.. ClassIncludeList!],
                     MultiMonitorSupport = MultiMonitorSupport,
                     UiLanguage = UiLanguage,
+                    RunsAsAdministrator = RunsAsAdministrator,
                     SoundOnFailure = SoundOnFailure,
                     ShowFocus = ShowFocus,
                     ShowFocusDuringAction = ShowFocusDuringAction

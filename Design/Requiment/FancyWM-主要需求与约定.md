@@ -37,6 +37,7 @@
 - **共享标签栏**：每块显示器在 stack 模式下只有**一个**根级 `StackPanel` 顶栏；各主窗口以**标签页**形式同栏切换，**不是**每窗一套独立 stack 面板。
 - **右键拖动标签**：在 stack 顶栏用**右键**拖动标签，可调整 stack 内窗口顺序（`TabBar` + `StackTabReorderRequested`）。
 - **标签不得无故消失**：stack ↔ 非 stack 切换、布局刷新后，标签栏应与 stack 子节点一致（见 §3 已修复项）。
+- **全部最小化/注销后**：根级 `StackPanel` 无子窗口时**不显示**顶部 stack 标签栏（overlay 过滤空 stack）；布局树可保留空 stack 以便还原后恢复 stack 模式。
 
 ### 1.4 Win + Shift + F / F1 与 Stack
 
@@ -47,6 +48,7 @@
 - **与 1.2 的关系**：托盘 = 本屏**全部**符合条件窗口一次并入标签栏；Win+Shift+F / F1 = **仅当前焦点窗** toggle 进出标签栏。
 - **默认快捷键**：`CreateStackPanel` = Win+Shift+F；`ToggleFloatingMode`（单窗浮动）= Win+Shift+T。
 - **F6 直接快捷键**（可选）：单独按 **F6** 与 Win+Shift+F 相同；设置 → 交互 →「启用 F6 stack 快捷键」/`EnableF6StackHotkey`，**默认启用**；关闭后不注册 F6 钩子。
+- **取消最大化回 stack**（可选）：设置 → 交互 →「取消最大化后回到 stack」/`AutoStackOnUnmaximize`，**默认启用**（当前行为）；关闭后从最大化还原的窗口**保持浮动**，不自动进 stack 标签栏（从最小化还原仍按原逻辑回 stack）。
 
 ### 1.5 双显示器行为一致
 
@@ -79,6 +81,13 @@
   - 「等待操作…」「按 F12 获取帮助」等非快捷键 toast。
   - 未识别快捷键的文字 toast（可保留短促 beep 作反馈）。
 - **保留**：操作失败、平铺异常、崩溃等**异常类**提示（`TilingFailedException`、`OnTilingFailed`、`OnWorkspaceUnhandledException` 等）。
+
+### 1.8 本分支默认设置（与上游差异）
+
+- **界面语言**：默认 **简体中文**（`UiLanguage` = `zh-CN`）；`LocalizationService` 无 `settings.json` 时亦回退中文。
+- **管理员启动**：默认 **启用**（`RunsAsAdministrator` = `true`）；启动时若未提权则 UAC 重启；设置页可关闭并写入 `settings.json`；仍兼容旧版 `administrator-mode` 标记文件。
+- **取消最大化回 stack**：见 §1.4，**默认启用**（`AutoStackOnUnmaximize` = `true`）。
+- **说明**：已有 `settings.json` 中显式保存的值优先于代码默认值；重置或删除配置后按上列默认生效。
 
 ---
 

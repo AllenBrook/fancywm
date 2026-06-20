@@ -67,6 +67,7 @@ namespace FancyWM
         private bool m_allocateNewPanelSpace;
 
         private bool m_stackAppendRestoredTabsToEnd = true;
+        private bool m_autoStackOnUnmaximize = true;
 
         private bool m_animateWindowMovement;
 
@@ -286,6 +287,7 @@ namespace FancyWM
             {
                 m_allocateNewPanelSpace = x.AllocateNewPanelSpace;
                 m_stackAppendRestoredTabsToEnd = x.StackAppendRestoredTabsToEnd;
+                m_autoStackOnUnmaximize = x.AutoStackOnUnmaximize;
                 m_animateWindowMovement = x.AnimateWindowMovement;
                 m_autoSplitCount = x.AutoSplitCount;
                 m_delayReposition = x.DelayReposition;

@@ -765,6 +765,12 @@
   <data name="Interaction.EnableF6StackHotkey.Description" xml:space="preserve">
     <value>单独按 F6 切换当前焦点窗口的 stack（与 Win+Shift+F 相同）。</value>
   </data>
+  <data name="Interaction.AutoStackOnUnmaximize" xml:space="preserve">
+    <value>取消最大化后回到 stack</value>
+  </data>
+  <data name="Interaction.AutoStackOnUnmaximize.Description" xml:space="preserve">
+    <value>stack 中的窗口从最大化还原时，自动回到顶部 stack 标签栏。关闭后窗口保持浮动，需手动 F6/Win+Shift+F 再进 stack。</value>
+  </data>
   <data name="Messages.NoPreviousDisplay" xml:space="preserve">
     <value>没有上一个显示器。</value>
   </data>

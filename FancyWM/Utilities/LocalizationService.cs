@@ -13,11 +13,11 @@ namespace FancyWM.Utilities
         public const string English = "en";
         public const string ChineseSimplified = "zh-CN";
 
-        public static string CurrentLanguage { get; private set; } = English;
+        public static string CurrentLanguage { get; private set; } = ChineseSimplified;
 
         public static void ApplyFromSettingsFile(string settingsPath)
         {
-            var language = English;
+            var language = ChineseSimplified;
             try
             {
                 if (File.Exists(settingsPath))
@@ -25,7 +25,7 @@ namespace FancyWM.Utilities
                     using var document = JsonDocument.Parse(File.ReadAllText(settingsPath));
                     if (document.RootElement.TryGetProperty(nameof(Models.Settings.UiLanguage), out var property))
                     {
-                        language = property.GetString() ?? English;
+                        language = property.GetString() ?? ChineseSimplified;
                     }
                 }
             }

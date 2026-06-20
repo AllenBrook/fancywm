@@ -765,6 +765,12 @@
   <data name="Interaction.EnableF6StackHotkey.Description" xml:space="preserve">
     <value>Press F6 alone to toggle stack on the focused window (same as Win+Shift+F).</value>
   </data>
+  <data name="Interaction.AutoStackOnUnmaximize" xml:space="preserve">
+    <value>Return to stack when unmaximizing</value>
+  </data>
+  <data name="Interaction.AutoStackOnUnmaximize.Description" xml:space="preserve">
+    <value>When a stacked window is restored from maximized, automatically rejoin the top stack tab bar. When disabled, the window stays floating until you stack it manually.</value>
+  </data>
   <data name="Messages.NoPreviousDisplay" xml:space="preserve">
     <value>No previous display.</value>
   </data>

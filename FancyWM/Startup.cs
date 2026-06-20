@@ -5,8 +5,10 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Principal;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 
+using FancyWM.Models;
 using FancyWM.Utilities;
 using FancyWM.DllImports;
 
@@ -101,12 +103,11 @@ Type 'FancyWM --help' from anywhere after installation.
         private static int AppMain(string[] args)
         {
             // Keep config, themes, and logs next to the executable (portable deployment).
-            var appDir = Path.GetFullPath(AppContext.BaseDirectory);
-            Directory.SetCurrentDirectory(appDir);
+            Directory.SetCurrentDirectory(AppPaths.ApplicationDirectory);
 
-            LocalizationService.ApplyFromSettingsFile(Path.GetFullPath("settings.json"));
+            LocalizationService.ApplyFromSettingsFile(AppPaths.SettingsFile);
 
-            if (File.Exists("administrator-mode") && !IsAdministrator())
+            if (ShouldRunAsAdministrator() && !IsAdministrator())
             {
                 try
                 {
@@ -353,6 +354,28 @@ Type 'FancyWM --help' from anywhere after installation.
         {
             var versionInfo = FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetEntryAssembly()!.Location);
             return versionInfo.FileVersion ?? "0.0.0.0";
+        }
+
+        private static bool ShouldRunAsAdministrator()
+        {
+            try
+            {
+                if (File.Exists(AppPaths.SettingsFile))
+                {
+                    var settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile));
+                    if (settings != null)
+                        return settings.RunsAsAdministrator;
+                }
+            }
+            catch
+            {
+                // Fall through to default / legacy marker.
+            }
+
+            if (File.Exists(AppPaths.AdministratorModeMarker))
+                return true;
+
+            return new Settings().RunsAsAdministrator;
         }
 
         private static bool IsAdministrator()

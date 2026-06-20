@@ -267,7 +267,7 @@ namespace FancyWM
             Hide();
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
 
-            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
+            ThemeEngineManager.Initialize(AppPaths.ThemesDirectory, "custom.css");
         }
 
         private UnmanagedResourceGuard? ApplySystemParameters()
