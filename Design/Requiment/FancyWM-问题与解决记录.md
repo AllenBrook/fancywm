@@ -232,3 +232,26 @@
 - **文件**：`Settings.cs`、`AppState.cs`、`LocalizationService.cs`、`Startup.cs`、`SettingsViewModel.cs`；主需求 §1.8。
 
 ---
+
+## 2026-06-20 · 跨屏拖动 stack 窗口仍变浮动（双屏复现）
+
+- **现象**：stack 窗口从 A 屏拖到 B 屏后变为普通浮动，未加入 B 屏 stack 标签栏；单屏 stack 正常。
+- **用户期望**：跨屏后保持 stack 语义（§1.5）。
+- **原因**：拖动过程中 `DoWindowMove` 按光标重排布局，窗口在中心越过边界前已脱离 stack；`RememberCrossDisplayStackTransfer` 仅认当前仍在 stack 树中的窗，转移标记未写入，目标屏被白名单/浮动逻辑拦截。
+- **处理**：
+  - 拖动开始时记录 `s_stackDragOrigins`（源屏 stack 窗）。
+  - 跨屏转移与 `DetectChanges` 手动注册同时认 `stackDragOrigin` / 转移标记。
+  - stack 窗用户拖动期间跳过 `DoWindowMove`；光标已离屏时不做布局移动。
+- **文件**：`TilingService.cs`、`TilingService.Private.cs`；主需求 §1.5。
+
+---
+
+## 2026-06-20 · 顶部 overlay「浮动」在 stack 内无效
+
+- **现象**：stack 中窗口点顶部「浮动」无效果；F6 正常。
+- **用户期望**：stack → 浮动与 F6 相同（原尺寸浮动，不拆并排）；非 stack 并排/浮动切换保持原逻辑。
+- **原因**：overlay 走 `ToggleFloat`（仅改 floatingSet），未从 stack 树 Unregister；F6 走 `StackWindow` → `FloatSingleWindowFromStack`。
+- **处理**：提取 `TryUnstackToFloat`；`ToggleFloat`、`Float()`、overlay 浮动按钮在 stack 内优先调用（与 F6 同路径）。
+- **文件**：`TilingService.cs`、`TilingService.Private.cs`；主需求 §1.4。
+
+---

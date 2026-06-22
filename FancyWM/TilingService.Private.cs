@@ -458,24 +458,40 @@ namespace FancyWM
 
             var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
 
+            if (TryUnstackToFloat(window))
+                return;
+
             using (m_backendLock.EnterScope())
             {
-                var node = m_backend.FindWindow(window);
-                if (node != null)
-                {
-                    var stack = node.PathToRoot.OfType<StackPanelNode>().FirstOrDefault();
-                    if (stack != null)
-                    {
-                        UnstackSingleWindow(node, stack);
-                        return;
-                    }
-                }
-
                 if (!TryJoinRootStack(window, desktop, setFocus: true))
                     throw new TilingFailedException(TilingError.MissingTarget);
 
                 InvalidateLayout();
             }
+        }
+
+        /// <summary>
+        /// stack → 浮动（与 F6 相同）：注销布局树、OnWindowFloated 原尺寸；不拆成并排 split。
+        /// </summary>
+        private bool TryUnstackToFloat(IWindow window)
+        {
+            WindowNode? windowNode;
+            StackPanelNode? stack;
+            using (m_backendLock.EnterScope())
+            {
+                var node = m_backend.FindWindow(window);
+                if (node is not WindowNode wn)
+                    return false;
+
+                stack = node.PathToRoot.OfType<StackPanelNode>().FirstOrDefault();
+                if (stack == null || !stack.Windows.Contains(wn))
+                    return false;
+
+                windowNode = wn;
+            }
+
+            UnstackSingleWindow(windowNode, stack);
+            return true;
         }
 
         /// <summary>
@@ -891,6 +907,9 @@ namespace FancyWM
 
         private void ToggleFloat(IWindow window)
         {
+            if (TryUnstackToFloat(window))
+                return;
+
             bool floated;
             using (m_floatingSetLock.EnterScope())
             {
@@ -1256,6 +1275,7 @@ namespace FancyWM
 
         private void OnWindowFloatRequested(object? sender, WindowNode e)
         {
+            // 顶部 overlay「浮动」：stack 内走 TryUnstackToFloat（同 F6），否则 ToggleFloat（并排/浮动切换）
             ToggleFloat(e.WindowReference);
         }
 
@@ -1553,6 +1573,7 @@ namespace FancyWM
             {
                 s_crossDisplayStackTransfers.Remove(e.Source);
             }
+            ClearStackDragOrigin(e.Source);
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
@@ -1632,6 +1653,7 @@ namespace FancyWM
             {
             }
 
+            ClearStackDragOrigin(e.Source);
             InvalidateLayout();
             using (m_ignoreRepositionSetLock.EnterScope())
             {
@@ -1679,7 +1701,7 @@ namespace FancyWM
                         try
                         {
                             MaybeRememberCrossDisplayStackTransfer(e.Source);
-                            DetectChanges(e.Source, manualRegistration: HasCrossDisplayStackTransfer(e.Source));
+                            DetectChanges(e.Source, manualRegistration: HasCrossDisplayStackTransfer(e.Source) || HasStackDragOrigin(e.Source));
                         }
                         catch (InvalidWindowReferenceException)
                         {
@@ -1725,7 +1747,9 @@ namespace FancyWM
 
                 if (e.NewPosition.Width == e.OldPosition.Width && e.NewPosition.Height == e.OldPosition.Height)
                 {
-                    if (!m_delayReposition)
+                    if (!m_delayReposition
+                        && IsWindowOnThisDisplay(e.Source)
+                        && !ShouldSkipLayoutMoveDuringUserDrag(e.Source))
                     {
                         DoWindowMove(e.Source);
                     }
@@ -2035,6 +2059,7 @@ namespace FancyWM
             {
                 m_ignoreRepositionSet.Add(e.Source);
             }
+            MarkStackDragOriginIfInStack(e.Source);
             m_currentInteraction = UserInteraction.Starting;
         }
 
@@ -2281,15 +2306,32 @@ namespace FancyWM
                 return;
             }
 
+            bool stackDragOrigin = HasStackDragOrigin(window);
+
             using (m_backendLock.EnterScope())
             {
                 if (!m_backend.HasWindow(window))
                 {
+                    if (stackDragOrigin)
+                    {
+                        RememberCrossDisplayStackTransfer(window);
+                    }
+
                     return;
                 }
 
                 var node = m_backend.FindWindow(window);
-                if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+                if (node == null)
+                {
+                    if (stackDragOrigin)
+                    {
+                        RememberCrossDisplayStackTransfer(window);
+                    }
+
+                    return;
+                }
+
+                if (!node.PathToRoot.OfType<StackPanelNode>().Any() && !stackDragOrigin)
                 {
                     return;
                 }
@@ -2302,7 +2344,7 @@ namespace FancyWM
         {
             node = null;
             var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
-            bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
+            bool crossDisplayStack = HasCrossDisplayStackTransfer(window) || HasStackDragOrigin(window);
 
             if (!crossDisplayStack && ShouldKeepAuxiliaryFloating(window))
             {
@@ -2350,7 +2392,7 @@ namespace FancyWM
             }
             else
             {
-                var restoreToStack = TakeCrossDisplayStackTransfer(window);
+                var restoreToStack = TakeCrossDisplayStackTransfer(window) || HasStackDragOrigin(window);
                 node = m_backend.RegisterWindow(window, maxTreeWidth);
                 if (restoreToStack && node.Parent is not StackPanelNode)
                 {
@@ -2377,7 +2419,7 @@ namespace FancyWM
             m_logger.Verbose("Dirty checking for changes with window {Window}", window.DebugString());
             try
             {
-                bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
+                bool crossDisplayStack = HasCrossDisplayStackTransfer(window) || HasStackDragOrigin(window);
                 bool allowManagedRegistration = manualRegistration || crossDisplayStack;
 
                 if (window.State == WindowState.Restored && CanManage(window, ignoreFloating: allowManagedRegistration))
@@ -2487,7 +2529,7 @@ namespace FancyWM
                 return;
             }
 
-            bool crossDisplayStack = HasCrossDisplayStackTransfer(window);
+            bool crossDisplayStack = HasCrossDisplayStackTransfer(window) || HasStackDragOrigin(window);
 
             using (m_floatingSetLock.EnterScope())
             {
@@ -2519,6 +2561,7 @@ namespace FancyWM
                 }
 
                 TakeCrossDisplayStackTransfer(window);
+                ClearStackDragOrigin(window);
                 RepairRootStackLayout(m_workspace.VirtualDesktopManager.CurrentDesktop);
             }
 
@@ -2601,10 +2644,13 @@ namespace FancyWM
 
         private void RememberCrossDisplayStackTransfer(IWindow window)
         {
-            var node = m_backend.FindWindow(window);
-            if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+            if (!HasStackDragOrigin(window))
             {
-                return;
+                var node = m_backend.FindWindow(window);
+                if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+                {
+                    return;
+                }
             }
 
             lock (s_crossDisplayStackTransfersLock)
@@ -2625,6 +2671,69 @@ namespace FancyWM
             lock (s_crossDisplayStackTransfersLock)
             {
                 return s_crossDisplayStackTransfers.Remove(window);
+            }
+        }
+
+        private static bool HasStackDragOrigin(IWindow window)
+        {
+            lock (s_stackDragOriginsLock)
+            {
+                return s_stackDragOrigins.ContainsKey(window);
+            }
+        }
+
+        private void MarkStackDragOriginIfInStack(IWindow window)
+        {
+            using (m_backendLock.EnterScope())
+            {
+                if (!m_backend.HasWindow(window))
+                {
+                    return;
+                }
+
+                var node = m_backend.FindWindow(window);
+                if (node == null || !node.PathToRoot.OfType<StackPanelNode>().Any())
+                {
+                    return;
+                }
+            }
+
+            lock (s_stackDragOriginsLock)
+            {
+                s_stackDragOrigins[window] = true;
+            }
+        }
+
+        private static void ClearStackDragOrigin(IWindow window)
+        {
+            lock (s_stackDragOriginsLock)
+            {
+                s_stackDragOrigins.Remove(window);
+            }
+        }
+
+        private bool ShouldSkipLayoutMoveDuringUserDrag(IWindow window)
+        {
+            if (m_currentInteraction != UserInteraction.Moving
+                && m_currentInteraction != UserInteraction.Starting)
+            {
+                return false;
+            }
+
+            return HasStackDragOrigin(window) || IsWindowInRootStack(window);
+        }
+
+        private bool IsWindowInRootStack(IWindow window)
+        {
+            using (m_backendLock.EnterScope())
+            {
+                if (!m_backend.HasWindow(window))
+                {
+                    return false;
+                }
+
+                var node = m_backend.FindWindow(window);
+                return node != null && node.PathToRoot.OfType<StackPanelNode>().Any();
             }
         }
 

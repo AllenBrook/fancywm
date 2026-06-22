@@ -184,6 +184,10 @@ namespace FancyWM
         private static readonly Dictionary<IWindow, bool> s_crossDisplayStackTransfers = new();
         private static readonly object s_crossDisplayStackTransfersLock = new();
 
+        /// <summary>User drag started while window was in a stack panel (per-window, cleared on move end).</summary>
+        private static readonly Dictionary<IWindow, bool> s_stackDragOrigins = new();
+        private static readonly object s_stackDragOriginsLock = new();
+
         /// <summary>
         /// Raised after a window is marked for cross-display stack handoff so the target display can admit it.
         /// </summary>
@@ -548,6 +552,9 @@ namespace FancyWM
         public void Float()
         {
             var window = m_workspace.FocusedWindow ?? throw new TilingFailedException(TilingError.MissingTarget);
+            if (TryUnstackToFloat(window))
+                return;
+
             ToggleFloat(window);
         }
 
