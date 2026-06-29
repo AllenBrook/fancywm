@@ -564,6 +564,12 @@
   <data name="Tray.SetPanelStack.Caption" xml:space="preserve">
     <value>设置面板堆叠</value>
   </data>
+  <data name="Tray.ToggleAllFeatures.Disable" xml:space="preserve">
+    <value>关闭全部功能</value>
+  </data>
+  <data name="Tray.ToggleAllFeatures.Enable" xml:space="preserve">
+    <value>开启全部功能</value>
+  </data>
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>

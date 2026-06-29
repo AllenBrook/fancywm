@@ -86,6 +86,13 @@ namespace FancyWM
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private LowLevelHotkey[] m_directHks = [];
         private DispatcherTimer m_dispatcherTimer;
+        private bool m_allFeaturesEnabled = true;
+        private bool m_activateOnCapsLock;
+        private bool m_enableF6StackHotkey;
+        private bool m_modifierMoveWindow;
+        private bool m_modifierMoveWindowAutoFocus;
+        private readonly MenuItem m_toggleAllFeaturesMenuItem;
+        private readonly MenuItem m_setPanelStackMenuItem;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public MainWindow()
@@ -125,8 +132,13 @@ namespace FancyWM
                 .Do(x => m_notifyVirtualDesktopServiceIncompatibility = x.NotifyVirtualDesktopServiceIncompatibility)
                 .Do(x =>
                 {
-                    m_mvm.IsEnabled = x.ModifierMoveWindow;
-                    m_mvm.AutoFocus = x.ModifierMoveWindowAutoFocus;
+                    m_modifierMoveWindow = x.ModifierMoveWindow;
+                    m_modifierMoveWindowAutoFocus = x.ModifierMoveWindowAutoFocus;
+                    if (m_allFeaturesEnabled)
+                    {
+                        m_mvm.IsEnabled = x.ModifierMoveWindow;
+                        m_mvm.AutoFocus = x.ModifierMoveWindowAutoFocus;
+                    }
                 })
                 .DistinctUntilChanged()
                 .Do(async x =>
@@ -165,7 +177,11 @@ namespace FancyWM
             var activateOnCapsLockSetting = settings
                 .Select(x => x.ActivateOnCapsLock)
                 .DistinctUntilChanged()
-                .Do(_ => Dispatcher.BeginInvoke(() => RebindCapsLockHotkey(_)));
+                .Do(x => Dispatcher.BeginInvoke(() =>
+                {
+                    m_activateOnCapsLock = x;
+                    RebindCapsLockHotkey(x);
+                }));
 
             var keybindingsSettings = settings
                 .Select(x => x.Keybindings)
@@ -175,7 +191,11 @@ namespace FancyWM
             var f6StackHotkeySettings = settings
                 .Select(x => x.EnableF6StackHotkey)
                 .DistinctUntilChanged()
-                .Do(_ => Dispatcher.BeginInvoke(() => RebindF6StackHotkey(_)));
+                .Do(x => Dispatcher.BeginInvoke(() =>
+                {
+                    m_enableF6StackHotkey = x;
+                    RebindF6StackHotkey(x);
+                }));
 
             var multiMonitorObservable = settings
                 .Select(x => x.MultiMonitorSupport)
@@ -237,12 +257,16 @@ namespace FancyWM
 
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
-            var setPanelStackMenuItem = new MenuItem
+            m_toggleAllFeaturesMenuItem = new MenuItem();
+            m_toggleAllFeaturesMenuItem.Click += OnToggleAllFeaturesClick;
+            UpdateToggleAllFeaturesMenuHeader();
+            m_contextMenu.Items.Insert(1, m_toggleAllFeaturesMenuItem);
+            m_setPanelStackMenuItem = new MenuItem
             {
                 Header = Strings.ResourceManager.GetString("Tray.SetPanelStack.Caption", Strings.Culture) ?? "Set panel stack",
             };
-            setPanelStackMenuItem.Click += OnSetPanelStackClick;
-            m_contextMenu.Items.Insert(1, setPanelStackMenuItem);
+            m_setPanelStackMenuItem.Click += OnSetPanelStackClick;
+            m_contextMenu.Items.Insert(2, m_setPanelStackMenuItem);
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_dispatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -494,6 +518,16 @@ namespace FancyWM
                     ClearModifiersOnMiss = true,
                 }).ToArray();
 
+            if (!m_allFeaturesEnabled)
+            {
+                foreach (var cmdHk in m_cmdHks)
+                {
+                    cmdHk.Dispose();
+                }
+                m_cmdHks = null;
+                return;
+            }
+
             foreach (var cmdHk in m_cmdHks)
             {
                 cmdHk.Pressed += OnCmdSequenceBegin;
@@ -502,7 +536,7 @@ namespace FancyWM
 
         private void RebindCapsLockHotkey(bool enabled)
         {
-            if (!enabled)
+            if (!enabled || !m_allFeaturesEnabled)
             {
                 if (m_capsLockHk != null)
                 {
@@ -535,7 +569,7 @@ namespace FancyWM
                 m_f6StackHk = null;
             }
 
-            if (!enabled)
+            if (!enabled || !m_allFeaturesEnabled)
             {
                 return;
             }
@@ -571,30 +605,33 @@ namespace FancyWM
 
             var newHotkeys = new List<LowLevelHotkey>();
             var failedHotkeys = new List<Keybinding>();
-            foreach (var x in keybindings
-                .Where(x => x.Value?.IsDirectMode == true))
+            if (m_allFeaturesEnabled)
             {
-                try
+                foreach (var x in keybindings
+                    .Where(x => x.Value?.IsDirectMode == true))
                 {
-                    var (modifiers, key) = KeyCodeHelper.GetModifierAndKeyCode(x.Value!.Keys);
-                    var hk = new LowLevelHotkey(m_llkbdHook, modifiers, key)
+                    try
                     {
-                        HideKeyPress = true,
-                        ScanOnRelease = false,
-                        ClearModifiersOnMiss = false,
-                        SideAgnostic = false,
-                    };
-                    hk.Pressed += delegate { OnDirectHotkeyPressed(x.Key); };
-                    newHotkeys.Add(hk);
-                }
-                catch (Win32Exception)
-                {
-                    failedHotkeys.Add(x.Value!);
-                }
-                catch (ArgumentException)
-                {
-                    // Failed because bad keys
-                    failedHotkeys.Add(x.Value!);
+                        var (modifiers, key) = KeyCodeHelper.GetModifierAndKeyCode(x.Value!.Keys);
+                        var hk = new LowLevelHotkey(m_llkbdHook, modifiers, key)
+                        {
+                            HideKeyPress = true,
+                            ScanOnRelease = false,
+                            ClearModifiersOnMiss = false,
+                            SideAgnostic = false,
+                        };
+                        hk.Pressed += delegate { OnDirectHotkeyPressed(x.Key); };
+                        newHotkeys.Add(hk);
+                    }
+                    catch (Win32Exception)
+                    {
+                        failedHotkeys.Add(x.Value!);
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Failed because bad keys
+                        failedHotkeys.Add(x.Value!);
+                    }
                 }
             }
 
@@ -739,6 +776,11 @@ namespace FancyWM
 
         private void ExecuteAction(BindableAction action, ref string? friendlyActionName)
         {
+            if (!m_allFeaturesEnabled)
+            {
+                return;
+            }
+
             switch (action)
             {
                 case BindableAction.CreateVerticalPanel:
@@ -1650,7 +1692,7 @@ namespace FancyWM
         {
             m_logger.Debug("Set panel stack requested from tray menu");
             m_contextMenu.IsOpen = false;
-            if (m_tiling == null)
+            if (!m_allFeaturesEnabled || m_tiling == null)
             {
                 return;
             }
@@ -1670,6 +1712,127 @@ namespace FancyWM
             m_logger.Debug("Application restart requested!");
             m_contextMenu.IsOpen = false;
             App.Current.RequestRestart();
+        }
+
+        private void OnToggleAllFeaturesClick(object? sender, RoutedEventArgs e)
+        {
+            m_contextMenu.IsOpen = false;
+            SetAllFeaturesEnabled(!m_allFeaturesEnabled);
+        }
+
+        private void UpdateToggleAllFeaturesMenuHeader()
+        {
+            var key = m_allFeaturesEnabled
+                ? "Tray.ToggleAllFeatures.Disable"
+                : "Tray.ToggleAllFeatures.Enable";
+            m_toggleAllFeaturesMenuItem.Header = Strings.ResourceManager.GetString(key, Strings.Culture)
+                ?? (m_allFeaturesEnabled ? "Turn off all features" : "Turn on all features");
+        }
+
+        private void SetAllFeaturesEnabled(bool enabled)
+        {
+            if (m_allFeaturesEnabled == enabled)
+            {
+                return;
+            }
+
+            m_allFeaturesEnabled = enabled;
+            if (enabled)
+            {
+                EnableAllFeatures();
+            }
+            else
+            {
+                DisableAllFeatures();
+            }
+
+            UpdateToggleAllFeaturesMenuHeader();
+            m_setPanelStackMenuItem.IsEnabled = enabled;
+        }
+
+        private void DisableAllFeatures()
+        {
+            m_logger.Information("All FancyWM features disabled from tray menu");
+
+            if (m_tiling?.Active == true)
+            {
+                m_tiling.Stop();
+            }
+
+            UnregisterAllHotkeys();
+            m_mvm.IsEnabled = false;
+            m_dispatcherTimer.Stop();
+
+            try
+            {
+                SystemParameters.Instance.WindowArranging = true;
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to restore system window arranging");
+            }
+        }
+
+        private void EnableAllFeatures()
+        {
+            m_logger.Information("All FancyWM features enabled from tray menu");
+
+            try
+            {
+                SystemParameters.Instance.WindowArranging = false;
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to disable system window arranging");
+            }
+
+            m_dispatcherTimer.Start();
+            m_mvm.IsEnabled = m_modifierMoveWindow;
+            m_mvm.AutoFocus = m_modifierMoveWindowAutoFocus;
+
+            if (m_tiling != null)
+            {
+                m_tiling.Start();
+                m_tiling.Refresh();
+            }
+
+            RebindActivationHotkey(m_activationHotkey);
+            RebindCapsLockHotkey(m_activateOnCapsLock);
+            RebindDirectHotkeys(m_keybindings);
+            RebindF6StackHotkey(m_enableF6StackHotkey);
+        }
+
+        private void UnregisterAllHotkeys()
+        {
+            if (m_cmdHks != null)
+            {
+                foreach (var cmdHk in m_cmdHks)
+                {
+                    cmdHk.Pressed -= OnCmdSequenceBegin;
+                    cmdHk.Dispose();
+                }
+                m_cmdHks = null;
+            }
+
+            if (m_capsLockHk != null)
+            {
+                m_capsLockHk.Pressed -= OnCmdSequenceBegin;
+                m_capsLockHk.Dispose();
+                m_capsLockHk = null;
+            }
+
+            if (m_f6StackHk != null)
+            {
+                m_f6StackHk.Pressed -= OnF6StackHotkeyPressed;
+                m_f6StackHk.Dispose();
+                m_f6StackHk = null;
+            }
+
+            foreach (var hk in m_directHks)
+            {
+                hk.Dispose();
+            }
+            m_directHks = [];
         }
 
         private void OnExitClick(object? sender, RoutedEventArgs e)

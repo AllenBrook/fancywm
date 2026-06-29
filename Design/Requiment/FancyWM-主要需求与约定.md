@@ -89,6 +89,15 @@
 - **取消最大化回 stack**：见 §1.4，**默认启用**（`AutoStackOnUnmaximize` = `true`）。
 - **说明**：已有 `settings.json` 中显式保存的值优先于代码默认值；重置或删除配置后按上列默认生效。
 
+### 1.9 托盘「开启/关闭全部功能」
+
+- **入口**：托盘右键菜单，**单个**菜单项在两种文案间切换。
+- **关闭全部功能**：**不退出进程**；效果等同 FancyWM 未运行——停止平铺并还原窗口、注销全部快捷键、停用修饰键拖窗、停止窗口发现、恢复系统窗口贴靠（`WindowArranging`）；**进程与托盘图标保留**。
+- **开启全部功能**：同一菜单项切换文案后点击，恢复平铺、快捷键与窗口发现，效果等同重新打开 FancyWM。
+- **持久化**：**不保存**开关状态；每次启动程序默认**全部功能开启**。
+- **与「退出」区别**：「退出」结束进程；「关闭全部功能」仅停用功能，可随时从托盘再开。
+- **边界**：关闭期间「设置面板堆叠」灰显；「设置」「重启」「退出」仍可用。
+
 ---
 
 ## 2. 工程与构建约定
@@ -151,6 +160,7 @@
 | 已采纳 | Stack 统一使用显示器**顶部共享标签栏**（根 `StackPanel`）；托盘整屏并入、F6/Win+Shift+F 单窗 toggle 进出同一标签栏（§1.2–§1.4） |
 | 已废止 | ~~每窗/每进程独立 `WrapInStackPanel` stack 壳~~（2026-06-15 文档误记，非用户本意） |
 | 已采纳 | 问题与解决记入 `FancyWM-问题与解决记录.md`（Agent 见 `issue-resolution-log.mdc`） |
+| 已采纳 | 托盘单项切换开启/关闭全部功能；软停用保留进程，启动默认开启（§1.9） |
 
 ---
 
@@ -175,6 +185,7 @@
 | 标签同步 | `TilingOverlayRenderer.cs` → `SyncChildNodes`、`UpdateViewModels` |
 | 自动平铺白名单 | `TilingService.Private.cs` → `ShouldAutoTile`、`DetectChanges`；`MainWindow.xaml.cs` → `InclusionMatchers`；规则页 Include 列表 |
 | 辅助弹窗识别 | `FancyWM/Utilities/AuxiliaryWindowRules.cs` |
+| 托盘开启/关闭全部功能 | `MainWindow.xaml.cs` → `SetAllFeaturesEnabled`、`DisableAllFeatures`、`EnableAllFeatures` |
 | Stack 新窗注册 | `TilingService.Private.cs` → `TryRegisterAutoTiledWindow*`、`ShouldFloatNewWindowInStackMode`、`ShouldKeepAuxiliaryFloating` |
 | 跨屏 stack | `TilingWorkspace.cs` → `TryGetRootStackPanel`、`GetOrCreateRootStackPanel` |
 | 空 stack 保留 | `FancyWM.Layouts/.../PanelNode.cs` → `RemoveIfEmpty` |

@@ -255,3 +255,15 @@
 - **文件**：`TilingService.cs`、`TilingService.Private.cs`；主需求 §1.4。
 
 ---
+
+## 2026-06-27 · 托盘开启/关闭全部功能
+
+- **用户期望**：有时用 FancyWM、有时用系统窗口管理；托盘**一个**菜单项切换；关闭/开启在**使用效果**上等同退出/打开 FancyWM，但**不结束进程**；重启后不保存关闭状态，启动即开启。
+- **处理**：
+  - 开启时菜单显示「关闭全部功能」，关闭时显示「开启全部功能」。
+  - 关闭：`Stop` 还原窗口、注销快捷键、停用修饰键拖窗、停止发现、恢复 `WindowArranging`；托盘保留。
+  - 开启：反向恢复并 `Start` + `Refresh`。
+  - 状态仅内存持有，不写 `settings.json`。
+- **文件**：`MainWindow.xaml.cs`、`Strings.resx`、`Strings.zh-CN.resx`；主需求 §1.9。
+
+---
