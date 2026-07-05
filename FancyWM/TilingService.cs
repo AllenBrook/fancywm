@@ -181,11 +181,14 @@ namespace FancyWM
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
         private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
 
-        private static readonly Dictionary<IWindow, bool> s_crossDisplayStackTransfers = new();
+        private readonly HashSet<IWindow> m_eventBoundWindows = [];
+        private readonly Utilities.DebugLock m_eventBoundWindowsLock = new(LockThreshold);
+
+        private static readonly Dictionary<IntPtr, bool> s_crossDisplayStackTransfers = new();
         private static readonly object s_crossDisplayStackTransfersLock = new();
 
         /// <summary>User drag started while window was in a stack panel (per-window, cleared on move end).</summary>
-        private static readonly Dictionary<IWindow, bool> s_stackDragOrigins = new();
+        private static readonly Dictionary<IntPtr, bool> s_stackDragOrigins = new();
         private static readonly object s_stackDragOriginsLock = new();
 
         /// <summary>
@@ -212,6 +215,8 @@ namespace FancyWM
         private UserInteraction m_currentInteraction = UserInteraction.None;
         private PanelNode? m_movingPanelNode;
         private ITilingServiceIntent? m_pendingIntent;
+        private LowLevelMouseHook? m_pendingIntentMouseHook;
+        private LowLevelMouseHook.ButtonStateChangedEventHandler? m_pendingIntentMouseHandler;
         private readonly Counter m_frozen = new();
         private readonly Stopwatch m_sw = new();
 
@@ -469,14 +474,24 @@ namespace FancyWM
             bool anyChanges = false;
             foreach (var window in windows)
             {
-                if (!IsWindowOnThisDisplay(window))
+                try
                 {
-                    continue;
+                    if (IsWindowOnThisDisplay(window))
+                    {
+                        EnsureEventHandlersBound(window);
+                        if (DetectChanges(window))
+                        {
+                            anyChanges = true;
+                        }
+                    }
+                    else
+                    {
+                        EnsureEventHandlersUnbound(window);
+                    }
                 }
-
-                if (DetectChanges(window))
+                catch (InvalidWindowReferenceException)
                 {
-                    anyChanges = true;
+                    EnsureEventHandlersUnbound(window);
                 }
             }
 
@@ -663,9 +678,15 @@ namespace FancyWM
             m_logger.Information("No longer managing display {Display}", m_display);
 
             m_active = false;
+            DetachPendingIntentMouseHook();
             m_subscriptions.Dispose();
 
+            PlacementFailed -= OnPlacementFailed;
+            PendingIntentChanged -= OnPendingIntentChanged;
             PlacementFailed = null;
+            PendingIntentChanged = null;
+
+            UnsubscribeGuiEvents();
 
             m_workspace.VirtualDesktopManager.DesktopAdded -= OnDesktopAdded;
             m_workspace.VirtualDesktopManager.DesktopRemoved -= OnDesktopRemoved;
@@ -678,13 +699,43 @@ namespace FancyWM
             m_display.ScalingChanged -= OnDisplayScalingChanged;
 
             // There is still the possibility that OnWindowAdded gets called, but hopefully that does not happen too often.
+            List<IWindow> boundWindows;
+            using (m_eventBoundWindowsLock.EnterScope())
+            {
+                boundWindows = [.. m_eventBoundWindows];
+            }
+            foreach (var window in boundWindows)
+            {
+                EnsureEventHandlersUnbound(window);
+            }
+
             using (m_windowSetLock.EnterScope())
             {
                 foreach (var window in m_windowSet)
                 {
-                    UnbindEventHandlers(window);
+                    EnsureEventHandlersUnbound(window);
                 }
             }
+        }
+
+        private void UnsubscribeGuiEvents()
+        {
+            m_gui.TilingNodeFocusRequested -= OnTilingNodeFocusRequested;
+            m_gui.TilingNodeCloseRequested -= OnTilingNodeCloseRequested;
+            m_gui.TilingNodePullUpRequested -= OnTilingNodePullUpRequested;
+            m_gui.TilingPanelMoving -= OnTilingPanelMoving;
+            m_gui.TilingPanelMoveRequested -= OnTilingPanelMoveRequested;
+            m_gui.BeginHorizontalWithRequested -= OnBeginHorizontalWithRequestedAsync;
+            m_gui.BeginVerticalWithRequested -= OnBeginVerticalWithRequested;
+            m_gui.BeginStackWithRequested -= OnBeginStackWithRequested;
+            m_gui.FloatRequested -= OnWindowFloatRequested;
+            m_gui.HorizontalSplitRequested -= OnWindowHorizontalSplitRequested;
+            m_gui.VerticalSplitRequested -= OnWindowVerticalSplitRequested;
+            m_gui.PullUpRequested -= OnWindowPullUpRequested;
+            m_gui.StackRequested -= OnWindowStackRequested;
+            m_gui.StackTabReorderRequested -= OnStackTabReorderRequested;
+            m_gui.IgnoreProcessRequested -= OnWindowIgnoreProcessRequested;
+            m_gui.IgnoreClassRequested -= OnWindowIgnoreClassRequested;
         }
 
         public bool CanResize(PanelOrientation orientation, double displayPercentage)

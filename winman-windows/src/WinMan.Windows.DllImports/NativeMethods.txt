@@ -15,6 +15,7 @@ GetCursorPos
 GetDesktopWindow
 GetForegroundWindow
 GetMessage
+PostMessage
 GetModuleHandle
 GetMonitorInfo
 GetParent

@@ -379,12 +379,22 @@ namespace WinMan.Windows
 
         public void Dispose()
         {
-            KillTimer(new HWND(), m_hTimer);
-            KillTimer(new HWND(), m_hTimerRecent);
+            if (m_isShuttingDown)
+            {
+                return;
+            }
+
             m_isShuttingDown = true;
             m_winEventHook?.Dispose();
+            m_winEventHook = null;
 
-            m_eventLoopThread?.Join(1000);
+            if (m_msgWnd != IntPtr.Zero)
+            {
+                // Wake GetMessage on the event thread; timer/window cleanup runs there after the loop exits.
+                PostMessage(new(m_msgWnd), 0, new WPARAM(), new LPARAM());
+            }
+
+            m_eventLoopThread?.Join(2000);
             m_processingLoop.Shutdown();
             m_backgroundProcessingLoop.Shutdown();
             m_processingThread?.Join(1000);
@@ -511,6 +521,14 @@ namespace WinMan.Windows
             while (!m_isShuttingDown && GetMessage(out MSG msg, new(m_msgWnd), 0, 0))
             {
                 WndProc(m_msgWnd, msg.message, msg.wParam, msg.lParam);
+            }
+
+            if (m_msgWnd != IntPtr.Zero)
+            {
+                KillTimer(new(m_msgWnd), IdtTimerWatch);
+                KillTimer(new(m_msgWnd), IdtRecentTimerWatch);
+                DestroyWindow(new(m_msgWnd));
+                m_msgWnd = IntPtr.Zero;
             }
         }
 
@@ -854,6 +872,8 @@ namespace WinMan.Windows
                     m_windowList.Remove(window);
                 }
 
+                RemoveFromRecentWindowList(window);
+
                 if (window.WindowObject == null)
                 {
                     // Window was never visible, no need to continue.
@@ -1028,6 +1048,14 @@ namespace WinMan.Windows
                         WindowRemoved?.Invoke(this, new WindowChangedEventArgs(window.WindowObject!));
                     }
                 }
+            }
+        }
+
+        private void RemoveFromRecentWindowList(Win32WindowHandle window)
+        {
+            lock (m_recentWindowList)
+            {
+                m_recentWindowList.RemoveAll(x => x.handle == window);
             }
         }
 

@@ -327,6 +327,21 @@ namespace FancyWM
             lock (m_syncRoot)
             {
                 m_subscriptions.Dispose();
+
+                Workspace.DisplayManager.Added -= OnDisplayAdded;
+                Workspace.DisplayManager.Removed -= OnDisplayRemoved;
+
+                foreach (var tiling in m_tilingServices.Values)
+                {
+                    tiling.PlacementFailed -= OnTilingFailed;
+                    tiling.PendingIntentChanged -= OnPendingIntentChanged;
+                    tiling.Stop();
+                    tiling.Dispose();
+                }
+                m_tilingServices.Clear();
+
+                m_focusedWindowLocationChanges.OnCompleted();
+                m_focusedWindowLocationChanges.Dispose();
             }
         }
 

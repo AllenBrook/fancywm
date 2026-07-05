@@ -1051,6 +1051,7 @@ namespace FancyWM
         {
             if (PendingIntent == null)
             {
+                DetachPendingIntentMouseHook();
                 _ = m_dispatcher.BeginInvoke(() =>
                 {
                     m_gui.PreviewWindows = EmptyWindowSet;
@@ -1058,44 +1059,67 @@ namespace FancyWM
             }
             else
             {
-                if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
+                AttachPendingIntentMouseHook();
+            }
+        }
+
+        private void DetachPendingIntentMouseHook()
+        {
+            if (m_pendingIntentMouseHook != null && m_pendingIntentMouseHandler != null)
+            {
+                m_pendingIntentMouseHook.ButtonStateChanged -= m_pendingIntentMouseHandler;
+            }
+
+            m_pendingIntentMouseHook = null;
+            m_pendingIntentMouseHandler = null;
+        }
+
+        private void AttachPendingIntentMouseHook()
+        {
+            DetachPendingIntentMouseHook();
+
+            if (App.Current.Services.GetService<LowLevelMouseHook>() is not LowLevelMouseHook mshk)
+            {
+                return;
+            }
+
+            var startPt = m_workspace.CursorLocation;
+            var dispatched = false;
+            void onMouseButtonChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
+            {
+                DetachPendingIntentMouseHook();
+                if (e.Button == LowLevelMouseHook.MouseButton.Left && e.IsPressed == false)
                 {
-                    var startPt = m_workspace.CursorLocation;
-                    bool dispatched = false;
-                    void onMouseButtonChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
+                    var pt = new Point(e.X, e.Y);
+                    if (Math.Abs(pt.X - startPt.X) > 5 || Math.Abs(pt.Y - startPt.Y) > 5)
                     {
-                        mshk.ButtonStateChanged -= onMouseButtonChanged;
-                        if (e.Button == LowLevelMouseHook.MouseButton.Left && e.IsPressed == false)
+                        if (!dispatched)
                         {
-                            var pt = new Point(e.X, e.Y);
-                            if (Math.Abs(pt.X - startPt.X) > 5 || Math.Abs(pt.Y - startPt.Y) > 5)
+                            dispatched = true;
+                            m_dispatcher.BeginInvoke(() =>
                             {
-                                if (!dispatched)
-                                {
-                                    dispatched = true;
-                                    m_dispatcher.BeginInvoke(() =>
-                                    {
-                                        HitTestCompletePendingIntent(pt);
-                                    });
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (!dispatched)
-                            {
-                                dispatched = true;
-                                m_dispatcher.BeginInvoke(() =>
-                                {
-                                    PendingIntent?.Cancel();
-                                    PendingIntent = null;
-                                });
-                            }
+                                HitTestCompletePendingIntent(pt);
+                            });
                         }
                     }
-                    mshk.ButtonStateChanged += onMouseButtonChanged;
+                }
+                else
+                {
+                    if (!dispatched)
+                    {
+                        dispatched = true;
+                        m_dispatcher.BeginInvoke(() =>
+                        {
+                            PendingIntent?.Cancel();
+                            PendingIntent = null;
+                        });
+                    }
                 }
             }
+
+            m_pendingIntentMouseHook = mshk;
+            m_pendingIntentMouseHandler = onMouseButtonChanged;
+            mshk.ButtonStateChanged += onMouseButtonChanged;
         }
 
         private void HitTestCompletePendingIntent(Point cursorPosition)
@@ -1170,7 +1194,7 @@ namespace FancyWM
                 }
 
 
-                BindEventHandlers(sourceNode.WindowReference);
+                EnsureEventHandlersBound(sourceNode.WindowReference);
                 using (m_windowSetLock.EnterScope())
                 {
                     m_windowSet.Add(sourceNode.WindowReference);
@@ -1489,7 +1513,7 @@ namespace FancyWM
             m_logger.Debug("Window {Window} added to workspace", e.Source.DebugString());
             try
             {
-                BindEventHandlers(e.Source);
+                ReconcileWindowEventBinding(e.Source);
                 using (m_windowSetLock.EnterScope())
                 {
                     m_windowSet.Add(e.Source);
@@ -1564,14 +1588,14 @@ namespace FancyWM
         {
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
-            UnbindEventHandlers(e.Source);
+            EnsureEventHandlersUnbound(e.Source);
             using (m_savedLocationsLock.EnterScope())
             {
                 m_savedLocations.Remove(e.Source);
             }
             lock (s_crossDisplayStackTransfersLock)
             {
-                s_crossDisplayStackTransfers.Remove(e.Source);
+                s_crossDisplayStackTransfers.Remove(e.Source.Handle);
             }
             ClearStackDragOrigin(e.Source);
             using (m_ignoreRepositionSetLock.EnterScope())
@@ -1660,6 +1684,14 @@ namespace FancyWM
                 m_ignoreRepositionSet.Remove(e.Source);
             }
             m_currentInteraction = UserInteraction.None;
+            try
+            {
+                ReconcileWindowEventBinding(e.Source);
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                EnsureEventHandlersUnbound(e.Source);
+            }
         }
 
         private TimeSpan m_lastPlacementFailed = TimeSpan.Zero;
@@ -1687,6 +1719,7 @@ namespace FancyWM
             }
             catch (InvalidWindowReferenceException)
             {
+                EnsureEventHandlersUnbound(e.Source);
                 return;
             }
 
@@ -1707,6 +1740,7 @@ namespace FancyWM
                         {
                         }
                     });
+                    ReconcileWindowEventBinding(e.Source);
                     return;
                 }
             }
@@ -1720,6 +1754,7 @@ namespace FancyWM
                         TryAcceptCrossDisplayStackWindow(e.Source);
                     }
 
+                    ReconcileWindowEventBinding(e.Source);
                     return;
                 }
             }
@@ -1793,6 +1828,14 @@ namespace FancyWM
             finally
             {
                 Unfreeze();
+                try
+                {
+                    ReconcileWindowEventBinding(e.Source);
+                }
+                catch (InvalidWindowReferenceException)
+                {
+                    EnsureEventHandlersUnbound(e.Source);
+                }
             }
         }
 
@@ -2128,6 +2171,94 @@ namespace FancyWM
             window.GotFocus -= OnWindowGotFocus;
             window.LostFocus -= OnWindowLostFocus;
             window.TopmostChanged -= OnWindowTopmostChanged;
+        }
+
+        private bool ShouldBindWindowEvents(IWindow window)
+        {
+            try
+            {
+                if (IsWindowOnThisDisplay(window))
+                {
+                    return true;
+                }
+
+                using (m_backendLock.EnterScope())
+                {
+                    if (m_backend.HasWindow(window))
+                    {
+                        return true;
+                    }
+                }
+
+                if (HasStackDragOrigin(window) && IsEventBound(window))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return false;
+            }
+        }
+
+        private bool IsEventBound(IWindow window)
+        {
+            using (m_eventBoundWindowsLock.EnterScope())
+            {
+                return m_eventBoundWindows.Contains(window);
+            }
+        }
+
+        private void EnsureEventHandlersBound(IWindow window)
+        {
+            if (!ShouldBindWindowEvents(window))
+            {
+                return;
+            }
+
+            using (m_eventBoundWindowsLock.EnterScope())
+            {
+                if (!m_eventBoundWindows.Add(window))
+                {
+                    return;
+                }
+            }
+
+            BindEventHandlers(window);
+        }
+
+        private void EnsureEventHandlersUnbound(IWindow window)
+        {
+            using (m_eventBoundWindowsLock.EnterScope())
+            {
+                if (!m_eventBoundWindows.Remove(window))
+                {
+                    return;
+                }
+            }
+
+            UnbindEventHandlers(window);
+        }
+
+        private void ReconcileWindowEventBinding(IWindow window)
+        {
+            try
+            {
+                if (ShouldBindWindowEvents(window))
+                {
+                    EnsureEventHandlersBound(window);
+                }
+                else
+                {
+                    EnsureEventHandlersUnbound(window);
+                }
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                EnsureEventHandlersUnbound(window);
+            }
         }
 
         private bool IsSwapModifierPressed()
@@ -2529,6 +2660,8 @@ namespace FancyWM
                 return;
             }
 
+            EnsureEventHandlersBound(window);
+
             bool crossDisplayStack = HasCrossDisplayStackTransfer(window) || HasStackDragOrigin(window);
 
             using (m_floatingSetLock.EnterScope())
@@ -2587,6 +2720,7 @@ namespace FancyWM
             }
 
             InvalidateLayout();
+            EnsureEventHandlersUnbound(window);
         }
 
         internal void FinalizeCrossDisplayLeaves()
@@ -2638,7 +2772,7 @@ namespace FancyWM
         {
             lock (s_crossDisplayStackTransfersLock)
             {
-                return s_crossDisplayStackTransfers.ContainsKey(window);
+                return s_crossDisplayStackTransfers.ContainsKey(window.Handle);
             }
         }
 
@@ -2655,7 +2789,7 @@ namespace FancyWM
 
             lock (s_crossDisplayStackTransfersLock)
             {
-                s_crossDisplayStackTransfers[window] = true;
+                s_crossDisplayStackTransfers[window.Handle] = true;
             }
 
             CrossDisplayStackTransferReady?.Invoke(window);
@@ -2670,7 +2804,7 @@ namespace FancyWM
         {
             lock (s_crossDisplayStackTransfersLock)
             {
-                return s_crossDisplayStackTransfers.Remove(window);
+                return s_crossDisplayStackTransfers.Remove(window.Handle);
             }
         }
 
@@ -2678,7 +2812,7 @@ namespace FancyWM
         {
             lock (s_stackDragOriginsLock)
             {
-                return s_stackDragOrigins.ContainsKey(window);
+                return s_stackDragOrigins.ContainsKey(window.Handle);
             }
         }
 
@@ -2700,7 +2834,7 @@ namespace FancyWM
 
             lock (s_stackDragOriginsLock)
             {
-                s_stackDragOrigins[window] = true;
+                s_stackDragOrigins[window.Handle] = true;
             }
         }
 
@@ -2708,7 +2842,7 @@ namespace FancyWM
         {
             lock (s_stackDragOriginsLock)
             {
-                s_stackDragOrigins.Remove(window);
+                s_stackDragOrigins.Remove(window.Handle);
             }
         }
 
