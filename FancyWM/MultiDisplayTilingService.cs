@@ -5,6 +5,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Threading;
 using System.Windows.Threading;
 
 using FancyWM.Models;
@@ -72,6 +73,9 @@ namespace FancyWM
         private IReadOnlyCollection<IWindowMatcher> m_inclusionMatchers = [];
         private readonly IObservable<ITilingServiceSettings> m_settings;
         private readonly object m_syncRoot = new();
+        private int m_disposed;
+
+        private bool IsDisposed => Volatile.Read(ref m_disposed) != 0;
 
         public MultiDisplayTilingService(IWorkspace workspace, IAnimationThread animationThread, IObservable<ITilingServiceSettings> settings)
         {
@@ -117,6 +121,11 @@ namespace FancyWM
                 .Throttle(TimeSpan.FromMilliseconds(100))
                 .Do(async _ => await Dispatcher.InvokeAsync(() =>
                 {
+                    if (IsDisposed)
+                    {
+                        return;
+                    }
+
                     UpdateActiveDisplay(reason: "the focused window was moved");
 
                     lock (m_syncRoot)
@@ -132,8 +141,18 @@ namespace FancyWM
 
         private void OnDisplayRemoved(object? sender, DisplayChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             Dispatcher.Invoke(() =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 lock (m_syncRoot)
                 {
                     if (m_activeDisplay.Equals(e.Source))
@@ -156,8 +175,18 @@ namespace FancyWM
 
         private void OnDisplayAdded(object? sender, DisplayChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             Dispatcher.Invoke(() =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 lock (m_syncRoot)
                 {
                     if (!m_tilingServices.ContainsKey(e.Source))
@@ -193,11 +222,21 @@ namespace FancyWM
 
         private void OnCrossDisplayStackTransferReady(IWindow window)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             _ = Dispatcher.InvokeAsync(() => AdmitCrossDisplayStackWindowOnOwningDisplay(window));
         }
 
         private void AdmitCrossDisplayStackWindowOnOwningDisplay(IWindow window)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             try
             {
                 var center = window.Position.Center;
@@ -223,6 +262,11 @@ namespace FancyWM
 
         private void OnFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (e.OldFocusedWindow != null)
             {
                 e.OldFocusedWindow.PositionChanged -= OnWindowPositionChanged;
@@ -235,6 +279,11 @@ namespace FancyWM
 
             _ = Dispatcher.InvokeAsync(() =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 UpdateActiveDisplay($"the focused window has changed to {e.NewFocusedWindow.DebugString()}");
 
                 lock (m_syncRoot)
@@ -326,6 +375,11 @@ namespace FancyWM
         {
             lock (m_syncRoot)
             {
+                if (Interlocked.Exchange(ref m_disposed, 1) != 0)
+                {
+                    return;
+                }
+
                 m_subscriptions.Dispose();
 
                 Workspace.DisplayManager.Added -= OnDisplayAdded;

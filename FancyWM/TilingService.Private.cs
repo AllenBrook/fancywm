@@ -949,6 +949,11 @@ namespace FancyWM
 
         private void OnDisplayScalingChanged(object? sender, DisplayScalingChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             PropagatePanelHeightChange();
         }
 
@@ -1019,10 +1024,10 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
-            if (PendingIntent == null)
+            if (IsDisposed || PendingIntent == null)
                 return;
 
-            m_dispatcher.BeginInvoke(() =>
+            PostToDispatcher(() =>
             {
                 if (PendingIntent is GroupWithIntent gwi)
                 {
@@ -1049,10 +1054,15 @@ namespace FancyWM
 
         private void OnPendingIntentChanged(object? sender, EventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (PendingIntent == null)
             {
                 DetachPendingIntentMouseHook();
-                _ = m_dispatcher.BeginInvoke(() =>
+                PostToDispatcher(() =>
                 {
                     m_gui.PreviewWindows = EmptyWindowSet;
                 });
@@ -1087,6 +1097,12 @@ namespace FancyWM
             var dispatched = false;
             void onMouseButtonChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
             {
+                if (IsDisposed)
+                {
+                    DetachPendingIntentMouseHook();
+                    return;
+                }
+
                 DetachPendingIntentMouseHook();
                 if (e.Button == LowLevelMouseHook.MouseButton.Left && e.IsPressed == false)
                 {
@@ -1096,7 +1112,7 @@ namespace FancyWM
                         if (!dispatched)
                         {
                             dispatched = true;
-                            m_dispatcher.BeginInvoke(() =>
+                            PostToDispatcher(() =>
                             {
                                 HitTestCompletePendingIntent(pt);
                             });
@@ -1108,7 +1124,7 @@ namespace FancyWM
                     if (!dispatched)
                     {
                         dispatched = true;
-                        m_dispatcher.BeginInvoke(() =>
+                        PostToDispatcher(() =>
                         {
                             PendingIntent?.Cancel();
                             PendingIntent = null;
@@ -1401,6 +1417,11 @@ namespace FancyWM
 
         private void OnDesktopAdded(object? sender, DesktopChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             m_logger.Information("Desktop {Desktop} added to workspace", e.Source);
             var orientation = m_display.Bounds.Width >= m_display.Bounds.Height ? PanelOrientation.Horizontal : PanelOrientation.Vertical;
             using (m_backendLock.EnterScope())
@@ -1411,6 +1432,11 @@ namespace FancyWM
 
         private void OnDesktopRemoved(object? sender, DesktopChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             m_logger.Information("Desktop {Desktop} removed from workspace", e.Source);
             using (m_backendLock.EnterScope())
             {
@@ -1420,13 +1446,23 @@ namespace FancyWM
 
         private void OnCurrentDesktopChanged(object? sender, CurrentDesktopChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             Refresh();
             InvalidateLayout();
         }
 
         private void OnWindowGotFocus(object? sender, WindowFocusChangedEventArgs e)
         {
-            m_dispatcher.BeginInvoke(() =>
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            PostToDispatcher(() =>
             {
                 m_logger.Information("Got focus on {Window}", e.Source.DebugString());
                 try
@@ -1510,6 +1546,11 @@ namespace FancyWM
 
         private void OnWindowAdded(object? sender, WindowChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             m_logger.Debug("Window {Window} added to workspace", e.Source.DebugString());
             try
             {
@@ -1544,7 +1585,7 @@ namespace FancyWM
                 if (CanManage(e.Source) && ShouldAutoTile(e.Source) && e.Source.State == WindowState.Restored)
                 {
                     m_logger.Information("Window {Window} can be managed, registering with backend ({Display})", e.Source.DebugString(), m_display);
-                    m_dispatcher.BeginInvoke(() =>
+                    PostToDispatcher(() =>
                     {
                         try
                         {
@@ -1586,6 +1627,11 @@ namespace FancyWM
 
         private void OnWindowRemoved(object? sender, WindowChangedEventArgs e)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
             EnsureEventHandlersUnbound(e.Source);
@@ -1642,7 +1688,7 @@ namespace FancyWM
 
         private void OnWindowPositionChangeEnd(object? sender, WindowPositionChangedEventArgs e)
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
                 return;
 
             if (m_delayReposition && m_currentInteraction == UserInteraction.Moving && IsWindowOnThisDisplay(e.Source))
@@ -1699,7 +1745,7 @@ namespace FancyWM
 
         private void OnWindowPositionChanged(object? sender, WindowPositionChangedEventArgs e)
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
                 return;
 
             if (m_sw.Elapsed - m_lastPlacementFailed <= TimeSpan.FromMilliseconds(100))
@@ -1729,7 +1775,7 @@ namespace FancyWM
                 {
                     // Some other event might have resulted in the movement of the window.
                     // Do not call DetectChanges under the lock, to avoid deadlock.
-                    m_dispatcher.InvokeAsync(() =>
+                    PostToDispatcherAsync(() =>
                     {
                         try
                         {
@@ -1841,7 +1887,7 @@ namespace FancyWM
 
         private void OnWindowTopmostChanged(object? sender, WindowTopmostChangedEventArgs e)
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
                 return;
 
             try
@@ -1872,7 +1918,7 @@ namespace FancyWM
 
         private void OnWindowStateChanged(object? sender, WindowStateChangedEventArgs e)
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
                 return;
 
             void UnregisterAndSaveLocation()
@@ -2095,7 +2141,7 @@ namespace FancyWM
 
         private void OnWindowPositionChangeStart(object? sender, WindowPositionChangedEventArgs e)
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
                 return;
 
             using (m_ignoreRepositionSetLock.EnterScope())
@@ -3135,7 +3181,7 @@ namespace FancyWM
 
         private void InvalidateLayout()
         {
-            if (!m_active)
+            if (!m_active || IsDisposed)
             {
                 return;
             }
@@ -3145,13 +3191,13 @@ namespace FancyWM
             {
                 return;
             }
-            m_dispatcher.InvokeAsync(new Action(() =>
+            PostToDispatcherAsync(() =>
             {
                 if (!m_dirty || m_frozen.IsPositive())
                     return;
                 m_dirty = false;
                 _ = UpdateLayoutAsync();
-            }), System.Windows.Threading.DispatcherPriority.DataBind);
+            }, System.Windows.Threading.DispatcherPriority.DataBind);
         }
 
         private void Freeze()
@@ -3201,8 +3247,18 @@ namespace FancyWM
 
         private void UpdateGuiNodeOptions()
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             m_dispatcher.Invoke(() =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 m_gui.PanelSpacing = GetPanelSpacing();
                 m_gui.PanelPadding = ToThickness(GetPanelPaddingRect());
                 m_gui.InvalidateView();

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Threading;
+using System.Threading;
 
 using FancyWM.Layouts.Tiling;
 using FancyWM.Utilities;
@@ -219,6 +220,45 @@ namespace FancyWM
         private LowLevelMouseHook.ButtonStateChangedEventHandler? m_pendingIntentMouseHandler;
         private readonly Counter m_frozen = new();
         private readonly Stopwatch m_sw = new();
+        private int m_disposed;
+
+        private bool IsDisposed => Volatile.Read(ref m_disposed) != 0;
+
+        private void PostToDispatcher(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            m_dispatcher.BeginInvoke(() =>
+            {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                action();
+            }, priority);
+        }
+
+        private void PostToDispatcherAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            _ = m_dispatcher.InvokeAsync(() =>
+            {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                action();
+            }, priority);
+        }
 
         public TilingService(IWorkspace workspace, IDisplay display, IAnimationThread animationThread, IObservable<ITilingServiceSettings> settings, bool autoRegisterWindows)
         {
@@ -294,6 +334,11 @@ namespace FancyWM
         {
             _ = m_dispatcher.RunAsync(() =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 m_allocateNewPanelSpace = x.AllocateNewPanelSpace;
                 m_stackAppendRestoredTabsToEnd = x.StackAppendRestoredTabsToEnd;
                 m_autoStackOnUnmaximize = x.AutoStackOnUnmaximize;
@@ -675,6 +720,11 @@ namespace FancyWM
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref m_disposed, 1) != 0)
+            {
+                return;
+            }
+
             m_logger.Information("No longer managing display {Display}", m_display);
 
             m_active = false;

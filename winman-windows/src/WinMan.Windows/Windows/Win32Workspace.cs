@@ -57,6 +57,10 @@ namespace WinMan.Windows
         private UIntPtr m_hTimer;
         private UIntPtr m_hTimerRecent;
         private bool m_isShuttingDown = false;
+        // Full m_windowList visibility scan every N timer ticks (~2s at 200ms).
+        private const int FullVisibilityScanInterval = 10;
+
+        private int m_timerWatchTick;
         private TimeSpan m_watchInterval = TimeSpan.FromMilliseconds(200);
 
         private HashSet<Win32Window> m_visibleWindows = new HashSet<Win32Window>();
@@ -587,7 +591,17 @@ namespace WinMan.Windows
             // Dirty checking is still needed, as some things do not have corresponding events.
             // For example, virtual desktop addition/removal or windows changing their WINDOWS_STYLE at runtime
             // cannot be observed directly.
-            RefreshConfiguration();
+            var fullScan = Interlocked.Increment(ref m_timerWatchTick) % FullVisibilityScanInterval == 0;
+            ScheduleAction(ref m_checkVirtualDesktopsQueued, CheckVirtualDesktops);
+            if (fullScan)
+            {
+                ScheduleAction(ref m_checkVisibilityChangesQueued, CheckVisibilityChanges);
+            }
+            else
+            {
+                ScheduleAction(ref m_checkVisibilityChangesQueued, CheckPriorityVisibilityChanges);
+            }
+            ScheduleAction(ref m_checkVisibleWindowsQueued, CheckVisibleWindows);
         }
 
         private int m_onRecentTimerWatchQueued = 0;
@@ -608,8 +622,8 @@ namespace WinMan.Windows
                     if ((now - t) <= RecentWindowDuration)
                     {
                         cleanedList.Add((t, w));
+                        checkList.Add(w);
                     }
-                    checkList.Add(w);
                 }
 
                 m_recentWindowList = cleanedList;
@@ -806,6 +820,33 @@ namespace WinMan.Windows
             foreach (var window in GetWindowListSnapshot())
             {
                 CheckVisibilityChanges(window);
+            }
+        }
+
+        private void CheckPriorityVisibilityChanges()
+        {
+            m_checkVisibilityChangesQueued = 0;
+            var handles = new HashSet<Win32WindowHandle>();
+
+            lock (m_recentWindowList)
+            {
+                foreach (var (_, w) in m_recentWindowList)
+                {
+                    handles.Add(w);
+                }
+            }
+
+            foreach (var window in GetVisibleWindowList())
+            {
+                if (m_windowSet.TryGetValue(window.Handle, out var handle))
+                {
+                    handles.Add(handle);
+                }
+            }
+
+            foreach (var w in handles)
+            {
+                CheckVisibilityChanges(w);
             }
         }
 
