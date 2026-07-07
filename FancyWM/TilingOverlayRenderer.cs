@@ -114,7 +114,6 @@ namespace FancyWM
             {
                 AnchorSource = overlayAnchorSource
             };
-            m_overlay.Show();
 
             m_panelItemPrimaryActionCommand = new DelegateCommand<TilingNodeViewModel>(OnOverlayPanelItemClick);
             m_panelItemSecondaryActionCommand = new DelegateCommand<TilingNodeViewModel>(OnOverlayPanelItemSecondaryAction);

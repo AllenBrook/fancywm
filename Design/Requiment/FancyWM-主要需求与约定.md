@@ -161,6 +161,7 @@
 | 已废止 | ~~每窗/每进程独立 `WrapInStackPanel` stack 壳~~（2026-06-15 文档误记，非用户本意） |
 | 已采纳 | 问题与解决记入 `FancyWM-问题与解决记录.md`（Agent 见 `issue-resolution-log.mdc`） |
 | 已采纳 | 托盘单项切换开启/关闭全部功能；软停用保留进程，启动默认开启（§1.9） |
+| 已采纳 | 启动内存保守优化：ModernWpf 仅加载当前主题、Toast 延迟创建、壁纸取色读文件、Overlay 去重复 Show（不改变 TilingService.Start 时机） |
 
 ---
 

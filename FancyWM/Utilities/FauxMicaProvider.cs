@@ -6,6 +6,12 @@ using System.Windows.Media;
 
 using FancyWM.DllImports;
 
+using DrawingColor = System.Drawing.Color;
+using DrawingImage = System.Drawing.Image;
+using DrawingBitmap = System.Drawing.Bitmap;
+using DrawingGraphics = System.Drawing.Graphics;
+using Drawing2D = System.Drawing.Drawing2D;
+
 namespace FancyWM.Utilities
 {
     internal class FauxMicaProvider : IMicaProvider
@@ -61,28 +67,8 @@ namespace FancyWM.Utilities
                         {
                             try
                             {
-                                IntPtr hwnd = GetWallpaperHWND();
-
-                                PInvoke.GetWindowRect(new(hwnd), out var rect);
-                                using var originalImage = new System.Drawing.Bitmap(rect.right - rect.left, rect.bottom - rect.top);
-
-                                {
-                                    using var graphics = System.Drawing.Graphics.FromImage(originalImage);
-                                    const PrintWindow_nFlags PW_RENDERFULLCONTENT = (PrintWindow_nFlags)0x00000002;
-                                    bool success = PInvoke.PrintWindow(new(hwnd), new HDC(graphics.GetHdc()), PW_RENDERFULLCONTENT);
-                                    graphics.ReleaseHdc();
-                                }
-
-                                using var pixelImage = new System.Drawing.Bitmap(originalImage, new(2, 2));
-                                var colors = new[]
-                                {
-                                    pixelImage.GetPixel(0, 0),
-                                    pixelImage.GetPixel(0, 1),
-                                    pixelImage.GetPixel(1, 0),
-                                    pixelImage.GetPixel(1, 1),
-                                };
-
-                                var primaryColor = TransformColor(AverageColor(colors));
+                                var primaryColor = TryGetPrimaryColorFromWallpaperFile(wallpaperPath)
+                                    ?? TryGetPrimaryColorFromWallpaperWindow();
 
                                 lock (m_syncRoot)
                                 {
@@ -133,6 +119,55 @@ namespace FancyWM.Utilities
             }
         }
 
+        private static DrawingColor? TryGetPrimaryColorFromWallpaperFile(string wallpaperPath)
+        {
+            if (!File.Exists(wallpaperPath))
+            {
+                return null;
+            }
+
+            using var stream = new FileStream(wallpaperPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var originalImage = DrawingImage.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: false);
+            return TransformColor(SampleAverageColor(originalImage));
+        }
+
+        private DrawingColor TryGetPrimaryColorFromWallpaperWindow()
+        {
+            IntPtr hwnd = GetWallpaperHWND();
+
+            PInvoke.GetWindowRect(new(hwnd), out var rect);
+            using var originalImage = new DrawingBitmap(rect.right - rect.left, rect.bottom - rect.top);
+
+            {
+                using var graphics = DrawingGraphics.FromImage(originalImage);
+                const PrintWindow_nFlags PW_RENDERFULLCONTENT = (PrintWindow_nFlags)0x00000002;
+                _ = PInvoke.PrintWindow(new(hwnd), new HDC(graphics.GetHdc()), PW_RENDERFULLCONTENT);
+                graphics.ReleaseHdc();
+            }
+
+            return TransformColor(SampleAverageColor(originalImage));
+        }
+
+        private static DrawingColor SampleAverageColor(DrawingImage originalImage)
+        {
+            using var pixelImage = new DrawingBitmap(2, 2);
+            using (var graphics = DrawingGraphics.FromImage(pixelImage))
+            {
+                graphics.InterpolationMode = Drawing2D.InterpolationMode.HighQualityBilinear;
+                graphics.DrawImage(originalImage, 0, 0, 2, 2);
+            }
+
+            var colors = new[]
+            {
+                pixelImage.GetPixel(0, 0),
+                pixelImage.GetPixel(0, 1),
+                pixelImage.GetPixel(1, 0),
+                pixelImage.GetPixel(1, 1),
+            };
+
+            return AverageColor(colors);
+        }
+
         private IntPtr GetWallpaperHWND()
         {
             IntPtr hwndDefView = IntPtr.Zero;
@@ -157,14 +192,14 @@ namespace FancyWM.Utilities
             return hwndDefView;
         }
 
-        private static System.Drawing.Color TransformColor(System.Drawing.Color color)
+        private static DrawingColor TransformColor(DrawingColor color)
         {
             var h = color.GetHue();
             var l = color.GetBrightness();
             return GDIColorFromHSL(h, 1, l);
         }
 
-        public static System.Drawing.Color GDIColorFromHSL(float h, float s, float l)
+        public static DrawingColor GDIColorFromHSL(float h, float s, float l)
         {
             byte r;
             byte g;
@@ -187,7 +222,7 @@ namespace FancyWM.Utilities
                 b = (byte)(255 * RGBComponent(v1, v2, hue - (1.0f / 3)));
             }
 
-            return System.Drawing.Color.FromArgb(r, g, b);
+            return DrawingColor.FromArgb(r, g, b);
         }
 
         private static float RGBComponent(float v1, float v2, float vH)
@@ -210,7 +245,7 @@ namespace FancyWM.Utilities
             return v1;
         }
 
-        private static System.Drawing.Color AverageColor(IEnumerable<System.Drawing.Color> colors)
+        private static DrawingColor AverageColor(IEnumerable<DrawingColor> colors)
         {
             int r = 0;
             int g = 0;
@@ -223,10 +258,10 @@ namespace FancyWM.Utilities
                 b += color.B;
                 count += 1;
             }
-            return System.Drawing.Color.FromArgb(r / count, g / count, b / count);
+            return DrawingColor.FromArgb(r / count, g / count, b / count);
         }
 
-        private static Color ToMediaColor(System.Drawing.Color color)
+        private static Color ToMediaColor(DrawingColor color)
         {
             return new Color
             {

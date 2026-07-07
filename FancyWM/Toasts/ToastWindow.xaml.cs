@@ -45,7 +45,6 @@ namespace FancyWM.Toasts
             _ = PInvoke.SetWindowLong(hwnd, GetWindowLongPtr_nIndex.GWL_STYLE, PInvoke.GetWindowLong(hwnd, GetWindowLongPtr_nIndex.GWL_STYLE) | (int)WINDOWS_STYLE.WS_DISABLED);
             _ = PInvoke.SetWindowLong(hwnd, GetWindowLongPtr_nIndex.GWL_EXSTYLE,
                 (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TOPMOST | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE));
-            Show();
         }
 
         private void OnPrimaryDisplayChanged(object? sender, PrimaryDisplayChangedEventArgs e)

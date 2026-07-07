@@ -8,12 +8,31 @@ namespace FancyWM.Toasts
     internal class ToastService : IToastService
     {
         private readonly IWorkspace m_workspace;
-        private readonly ToastWindow m_toastWindow;
+        private readonly object m_toastWindowSync = new();
+        private ToastWindow? m_toastWindow;
 
         public ToastService(IWorkspace workspace)
         {
             m_workspace = workspace;
-            m_toastWindow = App.Current.Dispatcher.Invoke(() => new ToastWindow(m_workspace));
+        }
+
+        private ToastWindow GetOrCreateToastWindow()
+        {
+            if (m_toastWindow != null)
+            {
+                return m_toastWindow;
+            }
+
+            lock (m_toastWindowSync)
+            {
+                if (m_toastWindow != null)
+                {
+                    return m_toastWindow;
+                }
+
+                m_toastWindow = App.Current.Dispatcher.Invoke(() => new ToastWindow(m_workspace));
+                return m_toastWindow;
+            }
         }
 
         public async Task ShowToastAsync(object content, CancellationToken cancellationToken)
@@ -23,9 +42,10 @@ namespace FancyWM.Toasts
                 return;
             }
 
+            var toastWindow = GetOrCreateToastWindow();
             var tcs = new TaskCompletionSource();
 
-            await m_toastWindow.Dispatcher.InvokeAsync(() => m_toastWindow.ShowToast(content, cancellationToken));
+            await toastWindow.Dispatcher.InvokeAsync(() => toastWindow.ShowToast(content, cancellationToken));
 
             using var completeRegistration = cancellationToken.Register(() => tcs.TrySetResult());
             await tcs.Task;

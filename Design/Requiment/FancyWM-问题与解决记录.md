@@ -267,3 +267,17 @@
 - **文件**：`MainWindow.xaml.cs`、`Strings.resx`、`Strings.zh-CN.resx`；主需求 §1.9。
 
 ---
+
+## 2026-07-07 · 启动占用 500MB+ 内存（保守优化）
+
+- **现象**：用户反馈程序功能不多但启动即占用 500MB 以上内存。
+- **用户期望**：在不影响 stack、平铺等核心功能的前提下降低启动占用。
+- **原因**：WPF + ModernWpf 三套主题预加载、Toast 全屏窗口启动即 Show、壁纸取色 `PrintWindow` 整屏位图、Overlay 构造时重复 `Show()`。
+- **最终处理**（保守方案，不改 `TilingService.Start` 时机、不减少每屏 overlay 窗口数）：
+  - `App.xaml`：`ThemeResources.CanBeAccessedAcrossThreads="False"`，仅加载当前主题。
+  - `ToastService` / `ToastWindow`：首条 toast 再创建窗口，构造时不再 `Show()`。
+  - `FauxMicaProvider`：优先从壁纸文件采样 2×2 取色；失败时回退 `PrintWindow`。
+  - `TilingOverlayRenderer`：移除构造时 `Show()`，保留 `TilingService.Start()` → `m_gui.Show()`。
+- **备注**：回归 stack 标签栏、Win+Shift+F/F6、托盘 Set Panel Stack、首条 toast、设置页主题切换。
+
+---
