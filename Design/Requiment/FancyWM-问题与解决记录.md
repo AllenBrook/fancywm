@@ -281,3 +281,16 @@
 - **备注**：回归 stack 标签栏、Win+Shift+F/F6、托盘 Set Panel Stack、首条 toast、设置页主题切换。
 
 ---
+
+## 2026-07-09 · 右键点击托盘区偶发不弹出菜单
+
+- **现象**：右键点击托盘图标时，偶发没有弹出菜单（或一闪而过）。
+- **用户期望**：托盘右键菜单稳定弹出（设置 / 重启 / 退出 / 开启关闭全部功能 / Set Panel Stack）。
+- **原因**：托盘菜单使用独立 `ContextMenu`（`NotifierContextMenu`），未绑定到 `TaskbarIcon`；且在 `TrayRightMouseDown` 直接 `IsOpen=true`，在窗口隐藏/焦点变化场景下会被系统或 WPF 立即取消。
+- **最终处理**：
+  - `MainWindow.xaml.cs`：将 `m_contextMenu` 绑定到 `m_notifyIcon.ContextMenu`。
+  - 右键事件中改为 UI 线程 `Dispatcher` 延迟打开，并显式设置 `Placement=MousePoint`，避免鼠标按下/释放竞争导致的“秒关/不弹”。
+- **文件**：`FancyWM/MainWindow.xaml`、`FancyWM/MainWindow.xaml.cs`。
+- **备注**：回归测试：托盘右键连续快速点击、切换焦点窗口后再右键、全屏应用前台时右键托盘。
+
+---

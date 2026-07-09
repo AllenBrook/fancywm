@@ -31,6 +31,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Text;
 using FancyWM.Resources;
+using System.Windows.Controls.Primitives;
 
 using Strings = FancyWM.Resources.Strings;
 using System.Data;
@@ -267,6 +268,7 @@ namespace FancyWM
             };
             m_setPanelStackMenuItem.Click += OnSetPanelStackClick;
             m_contextMenu.Items.Insert(2, m_setPanelStackMenuItem);
+            m_notifyIcon.ContextMenu = m_contextMenu;
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_dispatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -1424,7 +1426,23 @@ namespace FancyWM
 
         private void OnNotifyIconRightMouseDown(object? sender, RoutedEventArgs e)
         {
-            m_contextMenu.IsOpen = true;
+            e.Handled = true;
+
+            _ = Dispatcher.BeginInvoke(() =>
+            {
+                try
+                {
+                    // Ensure a clean open even if the menu was previously dismissed mid-click.
+                    m_contextMenu.IsOpen = false;
+                    m_contextMenu.PlacementTarget = this;
+                    m_contextMenu.Placement = PlacementMode.MousePoint;
+                    m_contextMenu.IsOpen = true;
+                }
+                catch (Exception ex)
+                {
+                    m_logger.Warning(ex, "Failed to open tray context menu");
+                }
+            }, DispatcherPriority.Background);
         }
 
         private async void OnVirtualDesktopChanged(object? sender, CurrentDesktopChangedEventArgs e)

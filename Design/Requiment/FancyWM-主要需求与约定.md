@@ -144,6 +144,7 @@
 | 2026-06-14 | Stack 下同进程查找/查询弹窗被纳入 stack | 同进程新窗一律进 stack → `AuxiliaryWindowRules` 识别辅助弹窗并保持浮动 | `AuxiliaryWindowRules.cs`、`TilingService*.cs` |
 | 2026-06-14 | Stack + 全屏 + 弹窗后取消全屏仅半屏 | 空 stack 被移除 + 新窗注册到根分屏 → 保留空 stack、stack 模式注册策略、`RepairRootStackLayout` | `PanelNode.cs`、`TilingService*.cs` |
 | 2026-06-15 | 取消 stack 后无法再次 Win+Shift+F stack | 浮动态重注册误进根 stack 标签栏 → EnsureRegisteredForManualStack + RegisterWindow(maxTreeWidth) | `TilingService.Private.cs` |
+| 2026-07-09 | 右键托盘区偶发不弹出菜单 | `ContextMenu` 未挂到 `TaskbarIcon` 且在 MouseDown 直接 IsOpen，隐藏窗口/焦点变化时会被取消 → 绑定 `m_notifyIcon.ContextMenu` 并延迟打开 | `MainWindow.xaml(.cs)` |
 
 ---
 
